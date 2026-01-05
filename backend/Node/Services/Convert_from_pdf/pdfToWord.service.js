@@ -6,57 +6,54 @@ const { exec } = require("child_process");
 // Function to get LibreOffice path based on OS
 const getLibreOfficePath = () => {
   if (process.platform === "win32") {
-    // Windows: Check common installation paths
     const windowsPaths = [
       "C:\\Program Files\\LibreOffice\\program\\soffice.exe",
       "C:\\Program Files (x86)\\LibreOffice\\program\\soffice.exe",
       "C:\\LibreOffice\\program\\soffice.exe"
     ];
-    
+
     for (const p of windowsPaths) {
-      if (fs.existsSync(p)) {
-        return p;
-      }
+      if (fs.existsSync(p)) return p;
     }
-    
-    // If not found in common paths, try PATH
     return "soffice.exe";
   } else {
-    // Unix-like systems
     return "soffice";
   }
 };
 
 module.exports = (pdfPath) => {
   return new Promise((resolve, reject) => {
-    const outputDir = os.tmpdir();
+    const outputDir = path.dirname(pdfPath);
     const baseName = path.basename(pdfPath, path.extname(pdfPath));
     const outputPath = path.join(outputDir, `${baseName}.docx`);
 
     const sofficePath = getLibreOfficePath();
-    const command = `"${sofficePath}" --headless --convert-to docx "${pdfPath}" --outdir "${outputDir}"`;
+
+    const command = `"${sofficePath}" --headless --infilter="writer_pdf_import" --convert-to docx:"MS Word 2007 XML" "${pdfPath}" --outdir "${outputDir}"`;
 
     console.log("🛠 LibreOffice CMD:", command);
 
-    exec(command, (error, stdout, stderr) => {
+    exec(command, { timeout: 30000 }, (error, stdout, stderr) => {
       if (error) {
         console.error("❌ PDF → Word failed");
         console.error("stderr:", stderr);
-        return reject(new Error(`PDF to Word conversion failed: ${error.message || stderr}`));
+        return reject(new Error(stderr || "LibreOffice conversion failed"));
       }
 
-      const checkFile = setInterval(() => {
+      // Wait and check if file exists
+      const fileWatcher = setInterval(() => {
         if (fs.existsSync(outputPath)) {
-          clearInterval(checkFile);
-          console.log("✅ PDF → Word ready:", outputPath);
+          clearInterval(fileWatcher);
+          console.log("🔥 PDF → Word ready:", outputPath);
           resolve(outputPath);
         }
       }, 300);
 
+      // Fallback timeout
       setTimeout(() => {
-        clearInterval(checkFile);
+        clearInterval(fileWatcher);
         reject(new Error("LibreOffice conversion timeout"));
-      }, 10000);
+      }, 30000);
     });
   });
 };

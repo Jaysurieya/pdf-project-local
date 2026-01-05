@@ -80,7 +80,113 @@ exports.convertToPdf = async (req, res) => {
 };
 
 
-exports.convertFromPdf = async (req, res) => {
+// exports.convertFromPdf = async (req, res) => {
+//   console.log("==== PDF CONVERT API HIT ====");
+//   console.log("ROUTE PARAM TYPE:", req.params.type);
+//   console.log("FILES:", req.files);
+
+//   const type = req.params.type;
+//   const file = req.files?.[0];
+
+//   // Validate request
+//   if (!type) {
+//     console.warn("⚠️ Missing conversion type");
+//     return res.status(400).json({ error: "Conversion type missing" });
+//   }
+//   if (!file) {
+//     console.warn("⚠️ No file received");
+//     return res.status(400).json({ error: "No PDF uploaded" });
+//   }
+
+//   console.log("INPUT FILE NAME:", file.originalname);
+//   console.log("INPUT FILE PATH:", file.path);
+
+//   try {
+//     if (type === "jpg") {
+//   console.log("➡️ Calling PDF → JPG service...");
+//   const result = await pdfToJpg(file.path);
+//   console.log("🧠 Service returned:", result);
+
+//   if (result.mode === "single") {
+//     return res.download(result.path, (err) => {
+//       if (err) console.error("❌ Download failed:", err);
+//       try {
+//         fs.unlinkSync(file.path);
+//         fs.unlinkSync(result.path);
+//         console.log("🧹 Cleanup done for single JPG");
+//       } catch (e) {
+//         console.warn("⚠️ Cleanup warning:", e.message);
+//       }
+//     });
+//   }
+
+//   if (result.mode === "multiple") {
+//     const zipPath = path.join(os.tmpdir(), `pdf-images-${randomUUID()}.zip`);
+//     console.log("📦 Zipping images to:", zipPath);
+
+//     const archive = archiver("zip");
+//     const stream = fs.createWriteStream(zipPath);
+//     archive.pipe(stream);
+
+//     result.files.forEach(img => {
+//       archive.file(img, { name: path.basename(img) });
+//     });
+
+//     await archive.finalize();
+
+//     stream.on("close", () => {
+//       res.download(zipPath, (err) => {
+//         if (err) console.error("❌ ZIP download error:", err);
+//         try {
+//           fs.unlinkSync(file.path);
+//           fs.unlinkSync(zipPath);
+//           result.files.forEach(f => fs.unlinkSync(f));
+//           console.log("🧹 Cleanup done for ZIP + images");
+//         } catch (e) {
+//           console.warn("⚠️ Cleanup warning:", e.message);
+//         }
+//       });
+//     });
+//   }
+// }
+
+
+//     else if (type === "word") {
+//       console.log("➡️ Calling Word conversion service...");
+//       const wordPath = await pdfToWord(file.path);
+//       console.log("✅ Word file created at:", wordPath);
+
+//       res.download(wordPath, err => {
+//         if (err) console.error("❌ Download failed:", err);
+
+//         // Cleanup
+//         try {
+//           fs.unlinkSync(file.path);
+//           fs.unlinkSync(wordPath);
+//           console.log("🧹 Cleanup done");
+//         } catch (e) {
+//           console.warn("⚠️ Cleanup issue:", e.message);
+//         }
+//       });
+//     }
+
+//     else {
+//       console.warn("⚠️ Unsupported type:", type);
+//       return res.status(400).json({ error: "Invalid conversion type" });
+//     }
+
+//   } catch (err) {
+//     console.error("🔥 SERVICE ERROR:", err);
+//     console.error("📌 ERROR MSG:", err.message);
+//     res.status(500).json({
+//       error: "Conversion service failed",
+//       message: err.message,
+//       stack: err.stack // for deep debugging
+//     });
+//   }
+// };
+
+exports.convertFromPdf = async (req, res) => { 
   console.log("==== PDF CONVERT API HIT ====");
   console.log("ROUTE PARAM TYPE:", req.params.type);
   console.log("FILES:", req.files);
@@ -88,100 +194,62 @@ exports.convertFromPdf = async (req, res) => {
   const type = req.params.type;
   const file = req.files?.[0];
 
-  // Validate request
-  if (!type) {
-    console.warn("⚠️ Missing conversion type");
-    return res.status(400).json({ error: "Conversion type missing" });
-  }
-  if (!file) {
-    console.warn("⚠️ No file received");
-    return res.status(400).json({ error: "No PDF uploaded" });
-  }
+  if (!type) return res.status(400).json({ error: "Conversion type missing" });
+  if (!file) return res.status(400).json({ error: "No PDF uploaded" });
 
   console.log("INPUT FILE NAME:", file.originalname);
   console.log("INPUT FILE PATH:", file.path);
 
   try {
     if (type === "jpg") {
-  console.log("➡️ Calling PDF → JPG service...");
-  const result = await pdfToJpg(file.path);
-  console.log("🧠 Service returned:", result);
+      console.log("➡️ Calling PDF → JPG service...");
+      const result = await pdfToJpg(file.path);
 
-  if (result.mode === "single") {
-    return res.download(result.path, (err) => {
-      if (err) console.error("❌ Download failed:", err);
-      try {
-        fs.unlinkSync(file.path);
-        fs.unlinkSync(result.path);
-        console.log("🧹 Cleanup done for single JPG");
-      } catch (e) {
-        console.warn("⚠️ Cleanup warning:", e.message);
+      // Single JPG download
+      if (result.mode === "single") {
+        return res.download(result.path, (err) => {
+          if (err) console.error("❌ Download failed:", err);
+          try {
+            fs.unlinkSync(file.path);
+            fs.unlinkSync(result.path);
+          } catch (e) {}
+        });
       }
-    });
-  }
 
-  if (result.mode === "multiple") {
-    const zipPath = path.join(os.tmpdir(), `pdf-images-${randomUUID()}.zip`);
-    console.log("📦 Zipping images to:", zipPath);
+      // Multiple pages ZIP download
+      if (result.mode === "multiple") {
+        return res.download(result.zip, (err) => {
+          if (err) console.error("❌ ZIP Download failed:", err);
+          try {
+            fs.unlinkSync(file.path);
+            result.files.forEach(f => fs.unlinkSync(f));
+            fs.unlinkSync(result.zip);
+          } catch (e) {}
+        });
+      }
+    }
 
-    const archive = archiver("zip");
-    const stream = fs.createWriteStream(zipPath);
-    archive.pipe(stream);
-
-    result.files.forEach(img => {
-      archive.file(img, { name: path.basename(img) });
-    });
-
-    await archive.finalize();
-
-    stream.on("close", () => {
-      res.download(zipPath, (err) => {
-        if (err) console.error("❌ ZIP download error:", err);
-        try {
-          fs.unlinkSync(file.path);
-          fs.unlinkSync(zipPath);
-          result.files.forEach(f => fs.unlinkSync(f));
-          console.log("🧹 Cleanup done for ZIP + images");
-        } catch (e) {
-          console.warn("⚠️ Cleanup warning:", e.message);
-        }
-      });
-    });
-  }
-}
-
-
+    // PDF → Word download
     else if (type === "word") {
       console.log("➡️ Calling Word conversion service...");
       const wordPath = await pdfToWord(file.path);
-      console.log("✅ Word file created at:", wordPath);
+      console.log("✅ Word ready:", wordPath);
 
-      res.download(wordPath, err => {
+      return res.download(wordPath, (err) => {
         if (err) console.error("❌ Download failed:", err);
-
-        // Cleanup
         try {
           fs.unlinkSync(file.path);
           fs.unlinkSync(wordPath);
-          console.log("🧹 Cleanup done");
-        } catch (e) {
-          console.warn("⚠️ Cleanup issue:", e.message);
-        }
+        } catch (e) {}
       });
     }
 
     else {
-      console.warn("⚠️ Unsupported type:", type);
       return res.status(400).json({ error: "Invalid conversion type" });
     }
 
   } catch (err) {
     console.error("🔥 SERVICE ERROR:", err);
-    console.error("📌 ERROR MSG:", err.message);
-    res.status(500).json({
-      error: "Conversion service failed",
-      message: err.message,
-      stack: err.stack // for deep debugging
-    });
+    res.status(500).json({ error: "Conversion service failed", message: err.message, stack: err.stack });
   }
 };

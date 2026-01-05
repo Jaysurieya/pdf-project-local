@@ -8,10 +8,10 @@ function Upload() {
 
   if (!config) {
     return (
-      <div className="tool-page min-h-screen flex items-center justify-center bg-white text-black">
+      <div className="tool-page min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white transition-colors">
         <div className="text-center">
           <h1 className="text-2xl font-bold text-red-500 mb-4">Tool Not Found</h1>
-          <p className="text-gray-600">The requested tool "{tool}" does not exist.</p>
+          <p className="text-slate-600 dark:text-slate-400">The requested tool "{tool}" does not exist.</p>
         </div>
       </div>
     );
@@ -149,16 +149,16 @@ function Upload() {
   };
 
   return (
-    <div className="tool-page min-h-screen bg-white text-black p-6">
+    <div className="tool-page min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white p-6 transition-colors">
       <div className="max-w-2xl mx-auto">
-        <h1 className="text-3xl font-bold text-center mb-8 text-gray-800">
+        <h1 className="text-3xl font-bold text-center mb-8 text-slate-800 dark:text-white">
           {config.title}
         </h1>
 
-        <div className="bg-gray-50 rounded-xl p-6 border border-gray-200 shadow-sm">
+        <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] p-8 border border-slate-100 dark:border-slate-800 shadow-lg transition-all">
           {/* FILE INPUT */}
-          <div className="mb-6">
-            <label className="block text-gray-700 font-medium mb-2">
+          <div className="mb-8">
+            <label className="block text-slate-700 dark:text-slate-300 font-medium mb-4">
               Select File(s)
             </label>
 
@@ -168,18 +168,18 @@ function Upload() {
                 accept={config.accept}
                 multiple={config.multiple}
                 onChange={handleFileChange}
-                className="w-full p-3 border border-gray-300 rounded-lg"
+                className="w-full p-4 border border-slate-200 dark:border-slate-700 rounded-2xl bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-200"
               />
 
               {/* PLUS BUTTON */}
               {config.multiple && (
-                <span className="text-sm text-gray-500 whitespace-nowrap">
+                <span className="text-sm text-slate-500 dark:text-slate-400 whitespace-nowrap">
                   + Add more
                 </span>
               )}
             </div>
 
-            <p className="text-sm text-gray-500 mt-2">
+            <p className="text-sm text-slate-500 dark:text-slate-400 mt-3">
               Accepted formats:{" "}
               {config.accept.replace(/\./g, "").replace(/,/g, ", ")}
             </p>
@@ -187,8 +187,8 @@ function Upload() {
 
           {/* PAGE INPUT */}
           {needsPages && (
-            <div className="mb-6">
-              <label className="block text-gray-700 font-medium mb-2">
+            <div className="mb-8">
+              <label className="block text-slate-700 dark:text-slate-300 font-medium mb-4">
                 Enter pages or range
               </label>
               <input
@@ -196,15 +196,15 @@ function Upload() {
                 placeholder="e.g. 1,3,5 or 1-4"
                 value={pagesInput}
                 onChange={(e) => setPagesInput(e.target.value)}
-                className="w-full p-3 border border-gray-300 rounded-lg"
+                className="w-full p-4 border border-slate-200 dark:border-slate-700 rounded-2xl bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-200"
               />
             </div>
           )}
 
           {/* ORDER INPUT */}
           {needsOrder && (
-            <div className="mb-6">
-              <label className="block text-gray-700 font-medium mb-2">
+            <div className="mb-8">
+              <label className="block text-slate-700 dark:text-slate-300 font-medium mb-4">
                 Enter new page order
               </label>
               <input
@@ -212,27 +212,27 @@ function Upload() {
                 placeholder="e.g. 3,1,4,2"
                 value={orderInput}
                 onChange={(e) => setOrderInput(e.target.value)}
-                className="w-full p-3 border border-gray-300 rounded-lg"
+                className="w-full p-4 border border-slate-200 dark:border-slate-700 rounded-2xl bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-200"
               />
             </div>
           )}
 
           {/* FILE LIST */}
           {files.length > 0 && (
-            <div className="mb-6">
-              <h3 className="font-medium text-gray-700 mb-2">Selected Files:</h3>
-              <ul className="space-y-2">
+            <div className="mb-8">
+              <h3 className="font-medium text-slate-700 dark:text-slate-300 mb-4">Selected Files:</h3>
+              <ul className="space-y-3">
                 {files.map((file, index) => (
                   <li
                     key={index}
-                    className="flex justify-between items-center text-sm bg-white p-2 rounded border"
+                    className="flex justify-between items-center text-sm bg-slate-50 dark:bg-slate-800 p-4 rounded-2xl border border-slate-100 dark:border-slate-700"
                   >
                     <span>
                       {file.name} ({(file.size / 1024 / 1024).toFixed(2)} MB)
                     </span>
                     <button
                       onClick={() => removeFile(index)}
-                      className="text-red-500 hover:text-red-700 text-xs"
+                      className="text-red-500 hover:text-red-700 dark:hover:text-red-400 text-sm font-medium"
                     >
                       Remove
                     </button>
@@ -247,10 +247,10 @@ function Upload() {
             <button
               onClick={handleProcess}
               disabled={loading || files.length === 0}
-              className={`px-6 py-3 rounded-lg font-medium ${
+              className={`px-8 py-4 rounded-2xl font-bold text-lg transition-all ${
                 loading || files.length === 0
-                  ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-                  : "bg-blue-600 text-white hover:bg-blue-700"
+                  ? "bg-slate-300 text-slate-500 cursor-not-allowed dark:bg-slate-700 dark:text-slate-500"
+                  : "bg-[#0061ff] text-white hover:bg-blue-700 shadow-lg hover:shadow-xl hover:-translate-y-0.5"
               }`}
             >
               {loading ? "Processing..." : "Process"}
