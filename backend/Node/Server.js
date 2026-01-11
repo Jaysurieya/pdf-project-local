@@ -4,6 +4,7 @@ const path = require("path");
 const organizeRoutes = require("./Routes/organize.routes");
 const convertRoutes = require("./Routes/convert.routes");
 const scanRoutes = require("./Routes/scan.routes");
+const editRoutes = require("./Routes/edit.routes");
 
 const app = express();
 
@@ -16,6 +17,7 @@ app.use("/files", express.static(path.join(__dirname, "..", "uploads")));
 app.use("/api/convert", convertRoutes);
 app.use("/api/organize", organizeRoutes);
 app.use("/api/scan", scanRoutes);
+app.use("/api/edit", editRoutes);
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {

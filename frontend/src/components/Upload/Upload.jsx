@@ -8,254 +8,443 @@ function Upload() {
 
   if (!config) {
     return (
-      <div className="tool-page min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white transition-colors">
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white">
         <div className="text-center">
           <h1 className="text-2xl font-bold text-red-500 mb-4">Tool Not Found</h1>
-          <p className="text-slate-600 dark:text-slate-400">The requested tool "{tool}" does not exist.</p>
+          <p>The requested tool does not exist.</p>
         </div>
       </div>
     );
   }
 
+  /* -------------------- STATES -------------------- */
   const [files, setFiles] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  // Organize PDF states
   const [pagesInput, setPagesInput] = useState("");
   const [orderInput, setOrderInput] = useState("");
 
-  // Tool behavior detection
-  const needsPages =
-    tool === "remove-pages" ||
-    tool === "split-pdf";
+  // Rotation
+  const [rotationAngle, setRotationAngle] = useState(90);
 
+  const [selectedOption, setSelectedOption] = useState(
+    config.options?.[0]?.value || ""
+  );
+
+  // Watermark
+  const [watermarkText, setWatermarkText] = useState("");
+  const [fontSize, setFontSize] = useState(24);
+  const [opacity, setOpacity] = useState(0.5);
+  const [color, setColor] = useState("gray");
+  const [position, setPosition] = useState("center");
+
+  // Crop
+  const [cropLeft, setCropLeft] = useState(0);
+  const [cropRight, setCropRight] = useState(0);
+  const [cropTop, setCropTop] = useState(0);
+  const [cropBottom, setCropBottom] = useState(0);
+
+  // Edit
+  const [editType, setEditType] = useState("metadata");
+  const [searchText, setSearchText] = useState("");
+  const [replaceText, setReplaceText] = useState("");
+  const [textYPosition, setTextYPosition] = useState(100);
+
+  const [metadata, setMetadata] = useState({
+    title: "",
+    author: "",
+    subject: "",
+    keywords: "",
+    creator: "",
+    producer: "",
+  });
+
+  /* -------------------- TOOL FLAGS -------------------- */
+  const needsPages = tool === "remove-pages" || tool === "split-pdf";
   const needsOrder = tool === "organize-pdf";
+  const needsRotate = tool === "rotate-pdf";
+  const needsWatermark = tool === "add-watermark";
+  const needsCrop = tool === "crop-pdf";
+  const needsEdit = tool === "edit-pdf";
+  const hasOptions = config.hasOptions;
 
-  // ADD / APPEND FILES LOGIC
+  /* -------------------- FILE HANDLING -------------------- */
   const handleFileChange = (e) => {
-    const selectedFiles = Array.from(e.target.files);
+    const selected = Array.from(e.target.files);
 
     if (config.multiple) {
-      // append files, avoid duplicates (name + size)
       setFiles((prev) => {
-        const existing = new Map(
-          prev.map((f) => [`${f.name}-${f.size}`, f])
-        );
-
-        selectedFiles.forEach((f) => {
-          existing.set(`${f.name}-${f.size}`, f);
-        });
-
-        return Array.from(existing.values());
+        const map = new Map(prev.map(f => [`${f.name}-${f.size}`, f]));
+        selected.forEach(f => map.set(`${f.name}-${f.size}`, f));
+        return Array.from(map.values());
       });
     } else {
-      setFiles(selectedFiles.slice(0, 1));
+      setFiles(selected.slice(0, 1));
     }
 
-    // reset input so same file can be re-added if needed
     e.target.value = "";
   };
 
-  // REMOVE SINGLE FILE
   const removeFile = (index) => {
-    setFiles((prev) => prev.filter((_, i) => i !== index));
+    setFiles(prev => prev.filter((_, i) => i !== index));
   };
 
-  // MAIN PROCESS
+  /* -------------------- PROCESS -------------------- */
   const handleProcess = async () => {
-    if (files.length === 0) {
-      alert("Please add file");
-      return;
-    }
+    if (!files.length) return alert("Please add a file");
 
-    if (needsPages && !pagesInput.trim()) {
-      alert("Please enter page numbers or range");
-      return;
-    }
+    if (needsPages && !pagesInput.trim())
+      return alert("Please enter page numbers");
 
-    if (needsOrder && !orderInput.trim()) {
-      alert("Please enter page order");
-      return;
-    }
+    if (needsOrder && !orderInput.trim())
+      return alert("Please enter page order");
+
+    if (needsWatermark && !watermarkText.trim())
+      return alert("Please enter watermark text");
+
+    if (needsCrop && files.length > 1)
+      return alert("Crop supports only single-page PDFs");
 
     setLoading(true);
 
     const formData = new FormData();
     formData.append("tool", config.toolKey);
+    files.forEach(f => formData.append("files", f));
 
-    // 👇 SAME VARIABLE, MULTIPLE FILES
-    files.forEach((file) => {
-      formData.append("files", file);
-    });
+    if (needsPages) formData.append("pages", pagesInput);
+    if (needsOrder) formData.append("order", orderInput);
+    if (needsRotate) formData.append("rotation", rotationAngle);
+    if (hasOptions) formData.append("option", selectedOption);
 
-    if (needsPages) {
-      formData.append("pages", pagesInput);
+    if (needsWatermark) {
+      formData.append("watermarkText", watermarkText);
+      formData.append("fontSize", fontSize);
+      formData.append("opacity", opacity);
+      formData.append("color", color);
+      formData.append("position", position);
     }
 
-    if (needsOrder) {
-      formData.append("order", orderInput);
+    if (needsCrop) {
+      formData.append("cropLeft", cropLeft);
+      formData.append("cropRight", cropRight);
+      formData.append("cropTop", cropTop);
+      formData.append("cropBottom", cropBottom);
+    }
+
+    if (needsEdit) {
+      formData.append("editType", editType);
+      if (editType === "metadata") {
+        formData.append("metadata", JSON.stringify(metadata));
+      } else {
+        formData.append("searchText", searchText);
+        formData.append("replaceText", replaceText);
+        formData.append("textY", textYPosition);
+      }
     }
 
     try {
       const res = await fetch(
         `http://localhost:5000${config.backendRoute}`,
-        {
-          method: "POST",
-          body: formData,
-        }
+        { method: "POST", body: formData }
       );
 
-      if (!res.ok) {
-        throw new Error(`Processing failed with status ${res.status}`);
-      }
+      if (!res.ok) throw new Error("Processing failed");
 
       const blob = await res.blob();
-
-      const url = window.URL.createObjectURL(blob);
+      const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-
-      let filename = "result.pdf";
-      switch (config.toolKey) {
-        case "word_to_pdf":
-        case "excel_to_pdf":
-        case "powerpoint_to_pdf":
-        case "jpg_to_pdf":
-        case "html_to_pdf":
-          filename = "converted.pdf";
-          break;
-        case "pdf_to_word":
-          filename = "converted.docx";
-          break;
-        case "pdf_to_excel":
-          filename = "converted.xlsx";
-          break;
-        case "pdf_to_jpg":
-          filename = "converted.jpg";
-          break;
-        default:
-          filename = "result.pdf";
-      }
-
-      a.download = filename;
+      a.download = config.downloadName || "result.pdf";
       a.click();
-      window.URL.revokeObjectURL(url);
+      URL.revokeObjectURL(url);
     } catch (err) {
-      console.error("Processing error:", err);
-      alert(`Processing failed: ${err.message || "Unknown error"}`);
+      alert(err.message);
     }
 
     setLoading(false);
   };
 
+  /* -------------------- UI -------------------- */
   return (
-    <div className="tool-page min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white p-6 transition-colors">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 p-6 text-slate-900 dark:text-white">
       <div className="max-w-2xl mx-auto">
-        <h1 className="text-3xl font-bold text-center mb-8 text-slate-800 dark:text-white">
-          {config.title}
-        </h1>
+        <h1 className="text-3xl font-bold text-center mb-8">{config.title}</h1>
 
-        <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] p-8 border border-slate-100 dark:border-slate-800 shadow-lg transition-all">
-          {/* FILE INPUT */}
-          <div className="mb-8">
-            <label className="block text-slate-700 dark:text-slate-300 font-medium mb-4">
-              Select File(s)
-            </label>
+        <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] p-8 shadow-lg">
+          <input
+            type="file"
+            accept={config.accept}
+            multiple={config.multiple}
+            onChange={handleFileChange}
+            className="w-full p-4 rounded-2xl border mb-6"
+          />
 
-            <div className="flex gap-3 items-center">
+          {hasOptions && (
+            <select
+              value={selectedOption}
+              onChange={e => setSelectedOption(e.target.value)}
+              className="w-full p-4 rounded-2xl border mb-6"
+            >
+              {config.options.map(opt => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          )}
+
+          {needsPages && (
+            <input
+              placeholder="1,3,5 or 1-4"
+              value={pagesInput}
+              onChange={e => setPagesInput(e.target.value)}
+              className="w-full p-4 rounded-2xl border mb-6"
+            />
+          )}
+
+          {needsOrder && (
+            <input
+              placeholder="3,1,4,2"
+              value={orderInput}
+              onChange={e => setOrderInput(e.target.value)}
+              className="w-full p-4 rounded-2xl border mb-6"
+            />
+          )}
+
+          {needsRotate && (
+            <div className="mb-6">
+              <label className="block mb-2">Rotation Angle:</label>
+              <select
+                value={rotationAngle}
+                onChange={e => setRotationAngle(Number(e.target.value))}
+                className="w-full p-4 rounded-2xl border"
+              >
+                <option value={90}>90° Clockwise</option>
+                <option value={180}>180°</option>
+                <option value={270}>90° Counterclockwise</option>
+                <option value={0}>Reset Rotation</option>
+              </select>
+            </div>
+          )}
+
+          {needsWatermark && (
+            <div className="mb-6">
               <input
-                type="file"
-                accept={config.accept}
-                multiple={config.multiple}
-                onChange={handleFileChange}
-                className="w-full p-4 border border-slate-200 dark:border-slate-700 rounded-2xl bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-200"
+                placeholder="Watermark text"
+                value={watermarkText}
+                onChange={e => setWatermarkText(e.target.value)}
+                className="w-full p-4 rounded-2xl border mb-4"
               />
+              
+              <div className="grid grid-cols-2 gap-4 mb-4">
+                <div>
+                  <label className="block mb-2">Font Size:</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="100"
+                    value={fontSize}
+                    onChange={e => setFontSize(Number(e.target.value))}
+                    className="w-full p-4 rounded-2xl border"
+                  />
+                </div>
+                <div>
+                  <label className="block mb-2">Opacity:</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="1"
+                    step="0.1"
+                    value={opacity}
+                    onChange={e => setOpacity(Number(e.target.value))}
+                    className="w-full p-4 rounded-2xl border"
+                  />
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4 mb-4">
+                <div>
+                  <label className="block mb-2">Color:</label>
+                  <select
+                    value={color}
+                    onChange={e => setColor(e.target.value)}
+                    className="w-full p-4 rounded-2xl border"
+                  >
+                    <option value="black">Black</option>
+                    <option value="white">White</option>
+                    <option value="gray">Gray</option>
+                    <option value="red">Red</option>
+                    <option value="blue">Blue</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block mb-2">Position:</label>
+                  <select
+                    value={position}
+                    onChange={e => setPosition(e.target.value)}
+                    className="w-full p-4 rounded-2xl border"
+                  >
+                    <option value="center">Center</option>
+                    <option value="top-left">Top Left</option>
+                    <option value="top-right">Top Right</option>
+                    <option value="bottom-left">Bottom Left</option>
+                    <option value="bottom-right">Bottom Right</option>
+                    <option value="repeat">Repeat</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          )}
 
-              {/* PLUS BUTTON */}
-              {config.multiple && (
-                <span className="text-sm text-slate-500 dark:text-slate-400 whitespace-nowrap">
-                  + Add more
-                </span>
+          {needsCrop && (
+            <div className="grid grid-cols-2 gap-4 mb-6">
+              <div>
+                <label className="block mb-2">Crop Left (%):</label>
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  value={cropLeft}
+                  onChange={e => setCropLeft(Number(e.target.value))}
+                  className="w-full p-4 rounded-2xl border"
+                  placeholder="Left margin"
+                />
+              </div>
+              <div>
+                <label className="block mb-2">Crop Right (%):</label>
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  value={cropRight}
+                  onChange={e => setCropRight(Number(e.target.value))}
+                  className="w-full p-4 rounded-2xl border"
+                  placeholder="Right margin"
+                />
+              </div>
+              <div>
+                <label className="block mb-2">Crop Top (%):</label>
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  value={cropTop}
+                  onChange={e => setCropTop(Number(e.target.value))}
+                  className="w-full p-4 rounded-2xl border"
+                  placeholder="Top margin"
+                />
+              </div>
+              <div>
+                <label className="block mb-2">Crop Bottom (%):</label>
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  value={cropBottom}
+                  onChange={e => setCropBottom(Number(e.target.value))}
+                  className="w-full p-4 rounded-2xl border"
+                  placeholder="Bottom margin"
+                />
+              </div>
+            </div>
+          )}
+
+          {needsEdit && (
+            <div className="mb-6">
+              <label className="block mb-2">Edit Type:</label>
+              <select
+                value={editType}
+                onChange={e => setEditType(e.target.value)}
+                className="w-full p-4 rounded-2xl border mb-4"
+              >
+                <option value="metadata">Edit Metadata</option>
+                <option value="text-replace">Replace Text</option>
+              </select>
+              
+              {editType === "metadata" ? (
+                <div className="space-y-4">
+                  <input
+                    placeholder="Title"
+                    value={metadata.title}
+                    onChange={e => setMetadata({...metadata, title: e.target.value})}
+                    className="w-full p-4 rounded-2xl border"
+                  />
+                  <input
+                    placeholder="Author"
+                    value={metadata.author}
+                    onChange={e => setMetadata({...metadata, author: e.target.value})}
+                    className="w-full p-4 rounded-2xl border"
+                  />
+                  <input
+                    placeholder="Subject"
+                    value={metadata.subject}
+                    onChange={e => setMetadata({...metadata, subject: e.target.value})}
+                    className="w-full p-4 rounded-2xl border"
+                  />
+                  <input
+                    placeholder="Keywords"
+                    value={metadata.keywords}
+                    onChange={e => setMetadata({...metadata, keywords: e.target.value})}
+                    className="w-full p-4 rounded-2xl border"
+                  />
+                  <input
+                    placeholder="Creator"
+                    value={metadata.creator}
+                    onChange={e => setMetadata({...metadata, creator: e.target.value})}
+                    className="w-full p-4 rounded-2xl border"
+                  />
+                  <input
+                    placeholder="Producer"
+                    value={metadata.producer}
+                    onChange={e => setMetadata({...metadata, producer: e.target.value})}
+                    className="w-full p-4 rounded-2xl border"
+                  />
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <input
+                    placeholder="Search Text"
+                    value={searchText}
+                    onChange={e => setSearchText(e.target.value)}
+                    className="w-full p-4 rounded-2xl border"
+                  />
+                  <input
+                    placeholder="Replace Text"
+                    value={replaceText}
+                    onChange={e => setReplaceText(e.target.value)}
+                    className="w-full p-4 rounded-2xl border"
+                  />
+                  <div>
+                    <label className="block mb-2">Y Position:</label>
+                    <input
+                      type="number"
+                      value={textYPosition}
+                      onChange={e => setTextYPosition(Number(e.target.value))}
+                      className="w-full p-4 rounded-2xl border"
+                      placeholder="Y coordinate for new text"
+                    />
+                  </div>
+                </div>
               )}
             </div>
-
-            <p className="text-sm text-slate-500 dark:text-slate-400 mt-3">
-              Accepted formats:{" "}
-              {config.accept.replace(/\./g, "").replace(/,/g, ", ")}
-            </p>
-          </div>
-
-          {/* PAGE INPUT */}
-          {needsPages && (
-            <div className="mb-8">
-              <label className="block text-slate-700 dark:text-slate-300 font-medium mb-4">
-                Enter pages or range
-              </label>
-              <input
-                type="text"
-                placeholder="e.g. 1,3,5 or 1-4"
-                value={pagesInput}
-                onChange={(e) => setPagesInput(e.target.value)}
-                className="w-full p-4 border border-slate-200 dark:border-slate-700 rounded-2xl bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-200"
-              />
-            </div>
           )}
 
-          {/* ORDER INPUT */}
-          {needsOrder && (
-            <div className="mb-8">
-              <label className="block text-slate-700 dark:text-slate-300 font-medium mb-4">
-                Enter new page order
-              </label>
-              <input
-                type="text"
-                placeholder="e.g. 3,1,4,2"
-                value={orderInput}
-                onChange={(e) => setOrderInput(e.target.value)}
-                className="w-full p-4 border border-slate-200 dark:border-slate-700 rounded-2xl bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-200"
-              />
+          {files.map((f, i) => (
+            <div key={i} className="flex justify-between mb-2 text-sm">
+              <span>{f.name}</span>
+              <button onClick={() => removeFile(i)} className="text-red-500">
+                Remove
+              </button>
             </div>
-          )}
+          ))}
 
-          {/* FILE LIST */}
-          {files.length > 0 && (
-            <div className="mb-8">
-              <h3 className="font-medium text-slate-700 dark:text-slate-300 mb-4">Selected Files:</h3>
-              <ul className="space-y-3">
-                {files.map((file, index) => (
-                  <li
-                    key={index}
-                    className="flex justify-between items-center text-sm bg-slate-50 dark:bg-slate-800 p-4 rounded-2xl border border-slate-100 dark:border-slate-700"
-                  >
-                    <span>
-                      {file.name} ({(file.size / 1024 / 1024).toFixed(2)} MB)
-                    </span>
-                    <button
-                      onClick={() => removeFile(index)}
-                      className="text-red-500 hover:text-red-700 dark:hover:text-red-400 text-sm font-medium"
-                    >
-                      Remove
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          {/* PROCESS BUTTON */}
-          <div className="flex justify-center">
-            <button
-              onClick={handleProcess}
-              disabled={loading || files.length === 0}
-              className={`px-8 py-4 rounded-2xl font-bold text-lg transition-all ${
-                loading || files.length === 0
-                  ? "bg-slate-300 text-slate-500 cursor-not-allowed dark:bg-slate-700 dark:text-slate-500"
-                  : "bg-[#0061ff] text-white hover:bg-blue-700 shadow-lg hover:shadow-xl hover:-translate-y-0.5"
-              }`}
-            >
-              {loading ? "Processing..." : "Process"}
-            </button>
-          </div>
+          <button
+            onClick={handleProcess}
+            disabled={loading}
+            className="w-full mt-6 py-4 bg-[#0061ff] text-white font-bold rounded-2xl"
+          >
+            {loading ? "Processing..." : "Process"}
+          </button>
         </div>
       </div>
     </div>

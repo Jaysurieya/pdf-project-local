@@ -197,52 +197,65 @@ function MobileScan() {
 
 
   return (
-    
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 p-4 text-slate-900 dark:text-white">
-      <div className="max-w-md mx-auto">
-        <h1 className="text-2xl font-bold text-center mb-6">Mobile Scan</h1>
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 px-4 py-6 text-slate-900 dark:text-white flex items-center justify-center">
+      <div className="w-full max-w-lg">
 
-        <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 shadow-lg">
+        <h1 className="text-3xl font-extrabold text-center mb-8 tracking-tight">
+          Mobile Scan
+        </h1>
+
+        <div className="bg-white/90 dark:bg-slate-900/80 backdrop-blur-xl rounded-3xl p-6 shadow-2xl border border-slate-200 dark:border-slate-800">
 
           {/* CAMERA */}
-          <video
-            ref={videoRef}
-            autoPlay
-            playsInline
-            muted
-            className="w-full h-64 object-cover rounded-xl border"
-          />
+          <div className="relative rounded-2xl overflow-hidden ring-4 ring-[#0061ff]/20">
+            <video
+              ref={videoRef}
+              autoPlay
+              playsInline
+              muted
+              className="w-full h-80 object-cover"
+            />
+
+            {/* Camera label */}
+            <div className="absolute bottom-2 left-1/2 -translate-x-1/2 bg-black/50 text-white text-xs px-3 py-1 rounded-full">
+              Live Camera
+            </div>
+          </div>
 
           {/* CAPTURE */}
           <button
             onClick={captureImage}
             disabled={!stream}
-            className={`w-full mt-4 py-3 rounded-xl font-bold ${
+            className={`w-full mt-6 py-4 rounded-2xl font-bold text-lg transition-all ${
               !stream
                 ? "bg-gray-400 cursor-not-allowed"
-                : "bg-[#0061ff] text-white hover:bg-blue-700"
+                : "bg-[#0061ff] text-white hover:bg-blue-700 active:scale-[0.98]"
             }`}
           >
-            Capture Image
+            📸 Capture Image
           </button>
 
           {/* PREVIEW */}
           {capturedImages.length > 0 && (
-            <div className="mt-6">
-              <h3 className="font-bold mb-3">
+            <div className="mt-8">
+
+              <h3 className="font-bold mb-4 text-center">
                 Captured Images ({capturedImages.length})
               </h3>
 
-              <div className="grid grid-cols-3 gap-2">
-                {capturedImages.map(img => (
-                  <div key={img.id} className="relative">
+              <div className="grid grid-cols-3 gap-3">
+                {capturedImages.map((img) => (
+                  <div
+                    key={img.id}
+                    className="relative group rounded-xl overflow-hidden shadow"
+                  >
                     <img
                       src={img.preview}
-                      className="h-20 w-full object-cover rounded"
+                      className="h-24 w-full object-cover"
                     />
                     <button
                       onClick={() => removeImage(img.id)}
-                      className="absolute top-1 right-1 bg-red-500 text-white w-5 h-5 rounded-full text-xs"
+                      className="absolute top-1 right-1 bg-red-500 text-white w-6 h-6 rounded-full text-sm opacity-0 group-hover:opacity-100 transition"
                     >
                       ×
                     </button>
@@ -254,17 +267,19 @@ function MobileScan() {
               <button
                 onClick={uploadAllImages}
                 disabled={uploading}
-                className={`w-full mt-4 py-3 rounded-xl font-bold ${
+                className={`w-full mt-6 py-4 rounded-2xl font-bold text-lg transition-all ${
                   uploading
                     ? "bg-gray-400 cursor-not-allowed"
-                    : "bg-emerald-500 text-white hover:bg-emerald-600"
+                    : "bg-emerald-500 text-white hover:bg-emerald-600 active:scale-[0.98]"
                 }`}
               >
-                {uploading ? "Uploading..." : "Send Images"}
+                {uploading ? "Uploading..." : "🚀 Send Images"}
               </button>
 
               {uploadStatus && (
-                <p className="text-center mt-3 text-sm">{uploadStatus}</p>
+                <p className="text-center mt-4 text-sm opacity-80">
+                  {uploadStatus}
+                </p>
               )}
             </div>
           )}
