@@ -1,15 +1,21 @@
 const express = require("express");
 const cors = require("cors");
+const path = require("path");
 const organizeRoutes = require("./Routes/organize.routes");
 const convertRoutes = require("./Routes/convert.routes");
+const scanRoutes = require("./Routes/scan.routes");
 
 const app = express();
 
 app.use(cors());
 app.use(express.json());
 
+// Serve uploaded files statically
+app.use("/files", express.static(path.join(__dirname, "..", "uploads")));
+
 app.use("/api/convert", convertRoutes);
 app.use("/api/organize", organizeRoutes);
+app.use("/api/scan", scanRoutes);
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
