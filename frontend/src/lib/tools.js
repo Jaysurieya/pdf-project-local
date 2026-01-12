@@ -184,13 +184,6 @@ export const TOOLS = {
     toolKey: "protect_pdf",
     backendRoute: "/api/security/protect"
   },
-  "compare-pdf": {
-    title: "Compare PDF",
-    accept: ".pdf",
-    multiple: true,
-    toolKey: "compare_pdf",
-    backendRoute: "/api/security/compare"
-  },
   "sign-pdf": {
     title: "Sign PDF",
     accept: ".pdf",

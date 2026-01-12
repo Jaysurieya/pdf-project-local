@@ -1,6 +1,8 @@
 import { useParams } from "react-router-dom";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { TOOLS } from "../../lib/tools";
+import SignatureCanvasBox from "./SignaturePad";
+import PdfPreview from "./PdfPreview";
 
 function Upload() {
   const { tool } = useParams();
@@ -20,6 +22,14 @@ function Upload() {
   /* -------------------- STATES -------------------- */
   const [files, setFiles] = useState([]);
   const [loading, setLoading] = useState(false);
+
+  // Password for protect/unlock
+  const [password, setPassword] = useState("");
+
+  // Sign PDF
+  const [signatureData, setSignatureData] = useState(null);
+  const [selectedPage, setSelectedPage] = useState(0);
+  const [placements, setPlacements] = useState([]);
 
   const [pagesInput, setPagesInput] = useState("");
   const [orderInput, setOrderInput] = useState("");
@@ -68,6 +78,11 @@ function Upload() {
   const needsEdit = tool === "edit-pdf";
   const hasOptions = config.hasOptions;
 
+  // Debug placements
+  useEffect(() => {
+    console.log("Current placements:", placements);
+  }, [placements]);
+
   /* -------------------- FILE HANDLING -------------------- */
   const handleFileChange = (e) => {
     const selected = Array.from(e.target.files);
@@ -82,11 +97,69 @@ function Upload() {
       setFiles(selected.slice(0, 1));
     }
 
+    // Reset signature-related states when new file is uploaded
+    if (config.toolKey === "sign_pdf") {
+      setSelectedPage(0);
+      setPlacements([]);
+      setSignatureData(null);
+    }
+
     e.target.value = "";
   };
 
   const removeFile = (index) => {
     setFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
+  /* -------------------- SIGN PDF HANDLER -------------------- */
+  const handleSign = async () => {
+    // ✅ FILTER VALID PLACEMENTS
+    const validPlacements = placements.filter(
+      (p) =>
+        typeof p.page === "number" &&
+        typeof p.xPercent === "number" &&
+        typeof p.yPercent === "number" &&
+        !isNaN(p.xPercent) &&
+        !isNaN(p.yPercent)
+    );
+
+    console.log("PLACEMENTS SENT TO BACKEND:", validPlacements);
+
+    if (!files[0] || !signatureData || validPlacements.length === 0) {
+      alert("Please upload PDF and place the signature on at least one page");
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const formData = new FormData();
+      formData.append("pdf", files[0]);
+      formData.append("signatureBase64", signatureData);
+      formData.append("placements", JSON.stringify(validPlacements));
+
+      const res = await fetch("http://localhost:5000/api/security/sign", {
+        method: "POST",
+        body: formData
+      });
+
+      if (!res.ok) throw new Error(await res.text() || "Signing failed");
+
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "signed.pdf";
+      a.click();
+
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error(err);
+      alert("Failed to sign PDF");
+    } finally {
+      setLoading(false);
+    }
   };
 
   /* -------------------- PROCESS -------------------- */
@@ -142,6 +215,16 @@ function Upload() {
       }
     }
 
+    // Handle password for protect/unlock PDF
+    if (config.toolKey === "protect_pdf" || config.toolKey === "unlock_pdf") {
+      if (!password.trim()) {
+        alert("Please enter a password");
+        setLoading(false);
+        return;
+      }
+      formData.append("password", password);
+    }
+
     try {
       const res = await fetch(
         `http://localhost:5000${config.backendRoute}`,
@@ -178,6 +261,61 @@ function Upload() {
             onChange={handleFileChange}
             className="w-full p-4 rounded-2xl border mb-6"
           />
+
+          {config.toolKey === "protect_pdf" && (
+            <div className="mb-6">
+              <label htmlFor="password" className="block mb-2">Password:</label>
+              <input
+                type="password"
+                id="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full p-4 rounded-2xl border"
+                placeholder="Enter password to protect PDF"
+              />
+            </div>
+          )}
+          {config.toolKey === "unlock_pdf" && (
+            <div className="mb-6">
+              <label htmlFor="password" className="block mb-2">Password:</label>
+              <input
+                type="password"
+                id="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full p-4 rounded-2xl border"
+                placeholder="Enter password to unlock PDF"
+              />
+            </div>
+          )}
+
+          {/* SIGN PDF UI */}
+          {config.toolKey === "sign_pdf" && (
+            <>
+              <div className="mb-6">
+                <SignatureCanvasBox onSave={setSignatureData} />
+              </div>
+
+              {files[0] && (
+                <div className="mb-6">
+                  <PdfPreview
+                    file={files[0]}
+                    selectedPage={selectedPage}
+                    setSelectedPage={setSelectedPage}
+                    signatureData={signatureData}
+                    placements={placements}
+                    onPlacement={(p) => {
+                      setPlacements((prev) => {
+                        // ✅ ensure one placement per page
+                        const rest = prev.filter((x) => x.page !== p.page);
+                        return [...rest, p];
+                      });
+                    }}
+                  />
+                </div>
+              )}
+            </>
+          )}
 
           {hasOptions && (
             <select
@@ -439,7 +577,7 @@ function Upload() {
           ))}
 
           <button
-            onClick={handleProcess}
+            onClick={config.toolKey === "sign_pdf" ? handleSign : handleProcess}
             disabled={loading}
             className="w-full mt-6 py-4 bg-[#0061ff] text-white font-bold rounded-2xl"
           >
@@ -452,3 +590,4 @@ function Upload() {
 }
 
 export default Upload;
+

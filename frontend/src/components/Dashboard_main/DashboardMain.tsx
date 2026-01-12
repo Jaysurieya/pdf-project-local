@@ -39,7 +39,7 @@ const DashboardMain = () => {
     {
       id: "security",
       title: "PDF SECURITY",
-      tools: ["Unlock PDF", "Protect PDF", "Compare PDF", "Sign PDF", "Redact PDF"]
+      tools: ["Unlock PDF", "Protect PDF", "Sign PDF", "Redact PDF"]
     }
   ];
 
