@@ -1,34 +1,33 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import Navbar from './Navbar';
-import Hero from './Hero';
-import Tools from './Tools';
-import Features from './Features';
-import Footer from './Footer';
-import AIAssistant from './AIAssistant';
-import { Sparkles, ArrowRight } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import Navbar from './components/Navbar';
+import Hero from './components/Hero';
+import Tools from './components/Tools';
+import Features from './components/Features';
+import Footer from './components/Footer';
+import AIAssistant from './components/AIAssistant';
+import Login from './components/Login';
+import ToolWorkspace from './components/ToolWorkspace';
+import { AnimatePresence, motion } from 'framer-motion';
 import { PDFTool } from './types';
 
-const DashboardMain = () => {
-  const navigate = useNavigate();
+const App: React.FC = () => {
   const [currentPage, setCurrentPage] = useState<'home' | 'login'>('home');
+  const [selectedTool, setSelectedTool] = useState<PDFTool | null>(null);
 
   const handleToolSelect = (tool: PDFTool) => {
-    // Navigate to the upload page for the selected tool
-    navigate(`/tool/${tool.id}`);
+    setSelectedTool(tool);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleNavigate = (page: 'home' | 'login') => {
     setCurrentPage(page);
+    setSelectedTool(null); // Clear selected tool when navigating
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-
-
   return (
     // Removed 'bg-white' and 'dark:bg-slate-950' to allow the body's 'aurora-bg' to control global theme
-    <div className="min-h-screen bg-white dark:bg-[#0B1220] transition-colors duration-300 relative z-0">
+    <div className="min-h-screen transition-colors duration-300 relative z-0">
       <Navbar currentPage={currentPage} onNavigate={handleNavigate} />
       
       <main>
@@ -41,15 +40,17 @@ const DashboardMain = () => {
               exit={{ opacity: 0 }}
               transition={{ duration: 0.3 }}
             >
-              <div className="p-8 text-center">
-                <h2>Login Page Placeholder</h2>
-                <button 
-                  onClick={() => handleNavigate('home')} 
-                  className="mt-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-                >
-                  Back to Home
-                </button>
-              </div>
+              <Login onBack={() => handleNavigate('home')} />
+            </motion.div>
+          ) : selectedTool ? (
+            <motion.div
+              key="tool-workspace"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.3 }}
+            >
+              <ToolWorkspace tool={selectedTool} onBack={() => setSelectedTool(null)} />
             </motion.div>
           ) : (
             <motion.div
@@ -72,4 +73,4 @@ const DashboardMain = () => {
   );
 };
 
-export default DashboardMain;
+export default App;

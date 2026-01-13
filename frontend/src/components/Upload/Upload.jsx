@@ -10,7 +10,7 @@ function Upload() {
 
   if (!config) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white">
+      <div className="min-h-screen flex items-center justify-center bg-white dark:bg-[#0B1220] text-slate-900 dark:text-white">
         <div className="text-center">
           <h1 className="text-2xl font-bold text-red-500 mb-4">Tool Not Found</h1>
           <p>The requested tool does not exist.</p>
@@ -249,11 +249,11 @@ function Upload() {
 
   /* -------------------- UI -------------------- */
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 p-6 text-slate-900 dark:text-white">
+    <div className="min-h-screen bg-white dark:bg-[#0B1220] p-6 text-slate-900 dark:text-white">
       <div className="max-w-2xl mx-auto">
         <h1 className="text-3xl font-bold text-center mb-8">{config.title}</h1>
 
-        <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] p-8 shadow-lg">
+        <div className="bg-white dark:bg-[#111827] rounded-[2.5rem] p-8 shadow-lg">
           <input
             type="file"
             accept={config.accept}

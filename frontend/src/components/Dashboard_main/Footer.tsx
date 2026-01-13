@@ -1,58 +1,55 @@
 import React from 'react';
-import { FileText, Facebook, Twitter, Instagram, Linkedin, Github } from 'lucide-react';
+import { Command, Twitter, Github, Linkedin, Facebook, Globe, Heart } from 'lucide-react';
 
 const Footer: React.FC = () => {
-  const handleAlert = () => alert("Frontend demo only");
+  const currentYear = new Date().getFullYear();
 
   const footerLinks = {
-    product: ['Merge PDF', 'Split PDF', 'Compress PDF', 'Office to PDF', 'PDF to JPG', 'Edit PDF', 'OCR PDF'],
-    solutions: ['Business', 'Education', 'Developers', 'Enterprise'],
-    company: ['About us', 'Features', 'Sustainability', 'Media Kit', 'Contact'],
-    support: ['Help Center', 'Security', 'Legal', 'Privacy Policy', 'Cookies Policy']
+    "Solutions": ["Merge PDF", "Split PDF", "Compress PDF", "Office to PDF", "PDF to JPG"],
+    "Company": ["About Us", "Story", "Careers", "Security", "Contact"],
+    "Community": ["API Documentation", "Knowledge Base", "Forum", "Blog", "Developers"],
+    "Legal": ["Terms of Service", "Privacy Policy", "Cookie Policy", "GDPR"]
   };
 
   return (
-    <footer className="bg-white border-t border-slate-100 pt-24 pb-12 dark:bg-slate-950 dark:border-slate-800">
+    // Changed bg to transparent in both modes
+    <footer className="bg-white/[0.01] dark:bg-[#0F172A] border-t border-slate-200 dark:border-slate-700 pt-20 pb-10 transition-colors backdrop-blur-sm">
       <div className="container mx-auto px-4 md:px-8">
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-12 mb-20">
+        
+        {/* Top Grid */}
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-10 mb-16">
           
-          {/* Brand Info */}
-          <div className="col-span-2 space-y-6">
-            <div className="flex items-center gap-2 cursor-pointer" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
-              <div className="bg-[#0061ff] p-1.5 rounded-lg text-white">
-                <FileText size={20} />
+          {/* Brand Column */}
+          <div className="col-span-2 lg:col-span-2 pr-0 lg:pr-10">
+            <div className="flex items-center gap-2.5 mb-6">
+              <div className="bg-[#0061ff] p-2 rounded-xl text-white shadow-lg shadow-blue-500/30">
+                <Command size={22} strokeWidth={2.5} />
               </div>
-              <span className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">PDF <span className="text-[#0061ff]">AI</span></span>
+              <span className="font-extrabold tracking-tight text-slate-900 dark:text-white text-xl">
+                Doc<span className="text-[#0061ff]">Flow</span>
+              </span>
             </div>
-            <p className="text-slate-500 dark:text-slate-400 text-sm leading-relaxed max-w-xs">
-              Every tool you need to use PDFs, at your fingertips. All are 100% FREE and easy to use! Merge, split, compress, convert, rotate, unlock and watermark PDFs with just a few clicks.
+            <p className="text-slate-500 dark:text-slate-300 font-medium leading-relaxed mb-6">
+              Making document workflows easy, fast, and smart. Trusted by millions of users worldwide to manage their files efficiently.
             </p>
             <div className="flex items-center gap-4">
-              {[Facebook, Twitter, Instagram, Linkedin, Github].map((Icon, idx) => (
-                <button 
-                  key={idx} 
-                  onClick={handleAlert}
-                  className="p-2 text-slate-400 hover:text-[#0061ff] hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-all"
-                >
-                  <Icon size={20} />
-                </button>
-              ))}
+               <SocialLink href="#" icon={Twitter} />
+               <SocialLink href="#" icon={Github} />
+               <SocialLink href="#" icon={Linkedin} />
+               <SocialLink href="#" icon={Facebook} />
             </div>
           </div>
 
-          {/* Links */}
-          {Object.entries(footerLinks).map(([title, links]) => (
-            <div key={title} className="space-y-6">
-              <h4 className="font-bold text-slate-900 dark:text-slate-200 uppercase tracking-widest text-xs">{title}</h4>
+          {/* Links Columns */}
+          {Object.entries(footerLinks).map(([category, links]) => (
+            <div key={category} className="col-span-1">
+              <h4 className="font-bold text-slate-900 dark:text-white mb-6 text-sm uppercase tracking-widest">{category}</h4>
               <ul className="space-y-4">
                 {links.map((link) => (
                   <li key={link}>
-                    <button 
-                      onClick={handleAlert}
-                      className="text-sm text-slate-500 dark:text-slate-400 hover:text-[#0061ff] transition-colors"
-                    >
+                    <a href="#" className="text-slate-500 dark:text-slate-300 hover:text-[#0061ff] dark:hover:text-blue-400 font-medium text-sm transition-colors block">
                       {link}
-                    </button>
+                    </a>
                   </li>
                 ))}
               </ul>
@@ -61,19 +58,31 @@ const Footer: React.FC = () => {
         </div>
 
         {/* Bottom Bar */}
-        <div className="flex flex-col md:flex-row items-center justify-between pt-8 border-t border-slate-50 dark:border-slate-900 gap-4">
-          <p className="text-sm text-slate-400 font-medium">
-            © 2026 PDF AI – Frontend UI Demo. Made with Passion.
-          </p>
-          <div className="flex items-center gap-8">
-            <button onClick={handleAlert} className="text-xs font-bold text-slate-400 uppercase tracking-widest hover:text-slate-900 dark:hover:text-white">Privacy Policy</button>
-            <button onClick={handleAlert} className="text-xs font-bold text-slate-400 uppercase tracking-widest hover:text-slate-900 dark:hover:text-white">Terms of Use</button>
-            <button onClick={handleAlert} className="text-xs font-bold text-slate-400 uppercase tracking-widest hover:text-slate-900 dark:hover:text-white">Status</button>
+        <div className="pt-8 border-t border-slate-200 dark:border-slate-700 flex flex-col md:flex-row items-center justify-between gap-4">
+          <div className="text-slate-500 dark:text-slate-400 text-sm font-medium flex items-center gap-1">
+            © {currentYear} DocFlow. Made with <Heart size={14} className="text-red-500 fill-red-500" /> in San Francisco.
+          </div>
+          
+          <div className="flex items-center gap-6">
+             <button className="flex items-center gap-2 text-slate-600 dark:text-slate-300 font-bold text-sm hover:text-[#0061ff] transition-colors">
+               <Globe size={16} />
+               English
+             </button>
           </div>
         </div>
+
       </div>
     </footer>
   );
 };
+
+const SocialLink: React.FC<{ href: string; icon: any }> = ({ href, icon: Icon }) => (
+  <a 
+    href={href} 
+    className="w-10 h-10 rounded-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-500 dark:text-slate-400 hover:text-white dark:hover:text-white hover:bg-[#0061ff] hover:border-[#0061ff] transition-all duration-300 shadow-sm"
+  >
+    <Icon size={18} />
+  </a>
+);
 
 export default Footer;
