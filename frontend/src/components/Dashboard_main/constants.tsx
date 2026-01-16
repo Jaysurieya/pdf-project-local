@@ -45,7 +45,7 @@ export const TOOLS: PDFTool[] = [
     title: 'Split PDF', 
     description: 'Separate one page or a whole set for easy conversion into independent PDF files.', 
     icon: Scissors, 
-    category: 'edit', 
+    category: 'organize', 
     color: 'text-rose-600 dark:text-rose-400 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 group-hover:border-slate-200 dark:group-hover:border-slate-700',
     glow: 'bg-rose-500',
     keywords: ['separate', 'extract', 'pages', 'cut']

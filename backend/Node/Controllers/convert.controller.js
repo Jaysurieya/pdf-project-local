@@ -18,35 +18,36 @@ exports.convertToPdf = async (req, res) => {
   console.log("FILES COUNT:", req.files?.length || 0);
 
   const type = req.query.type; // jpg | word | excel | ppt | html
-  const file = req.files?.[0];
+  const files = req.files;
 
   if (!type) {
     return res.status(400).json({ error: "Conversion type missing" });
   }
 
-  if (!file) {
+  if (!files || files.length === 0) {
     return res.status(400).json({ error: "No file uploaded" });
   }
 
-  console.log("INPUT FILE:", file.originalname);
-  console.log("INPUT PATH:", file.path);
+  console.log("INPUT FILES:", files.map(f => f.originalname).join(", "));
 
   let outputPath;
+  const uploadedPaths = files.map(f => f.path);
 
   try {
     switch (type) {
       case "jpg":
-        outputPath = await jpgToPdf(file.path);
+        // Pass all image paths for multi-page PDF
+        outputPath = await jpgToPdf(uploadedPaths);
         break;
 
       case "word":
       case "excel":
       case "ppt":
-        outputPath = await officeToPdf(file.path);
+        outputPath = await officeToPdf(files[0].path);
         break;
 
       case "html":
-        outputPath = await htmlToPdf(file.path);
+        outputPath = await htmlToPdf(files[0].path);
         break;
 
       default:
@@ -60,9 +61,9 @@ exports.convertToPdf = async (req, res) => {
         console.error("❌ Download error:", err);
       }
 
-      // Safe cleanup
+      // Safe cleanup - delete all uploaded files
       try {
-        fs.unlinkSync(file.path);
+        uploadedPaths.forEach(p => fs.unlinkSync(p));
         fs.unlinkSync(outputPath);
       } catch (cleanupErr) {
         console.warn("⚠️ Cleanup warning:", cleanupErr.message);
@@ -205,7 +206,7 @@ exports.convertFromPdf = async (req, res) => {
       console.log("➡️ Calling PDF → JPG service...");
       const result = await pdfToJpg(file.path);
 
-      // Single JPG download
+      // Single JPG download - though our updated service always returns multiple mode now
       if (result.mode === "single") {
         return res.download(result.path, (err) => {
           if (err) console.error("❌ Download failed:", err);
@@ -218,13 +219,37 @@ exports.convertFromPdf = async (req, res) => {
 
       // Multiple pages ZIP download
       if (result.mode === "multiple") {
-        return res.download(result.zip, (err) => {
-          if (err) console.error("❌ ZIP Download failed:", err);
+        // Set proper headers for ZIP download
+        res.setHeader("Content-Type", "application/zip");
+        res.setHeader("Content-Disposition", `attachment; filename="${result.zipFileName}"`);
+        
+        // Stream the ZIP file
+        const fileStream = fs.createReadStream(result.zip);
+        fileStream.pipe(res);
+        
+        // Clean up after the download completes
+        fileStream.on("end", () => {
           try {
             fs.unlinkSync(file.path);
-            result.files.forEach(f => fs.unlinkSync(f));
+            // Our service already cleans up individual JPG files
             fs.unlinkSync(result.zip);
-          } catch (e) {}
+            console.log("🧹 Cleanup done for ZIP + input file");
+          } catch (e) {
+            console.warn("⚠️ Cleanup warning:", e.message);
+          }
+        });
+        
+        fileStream.on("error", (err) => {
+          console.error("❌ File stream error:", err);
+          try {
+            fs.unlinkSync(file.path);
+            if (fs.existsSync(result.zip)) {
+              fs.unlinkSync(result.zip);
+            }
+          } catch (e) {
+            console.warn("⚠️ Cleanup warning:", e.message);
+          }
+          res.status(500).json({ error: "Error streaming file" });
         });
       }
     }

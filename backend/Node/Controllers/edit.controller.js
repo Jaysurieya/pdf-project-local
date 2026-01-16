@@ -53,10 +53,14 @@ const addWatermark = async (req, res) => {
     const opacity = parseFloat(req.body.opacity) || 0.5;
     const color = req.body.color || "gray";
     const position = req.body.position || "center";
-
+    const fontFamily = req.body.fontFamily || "Helvetica-Bold"; // Font family option
+    const diagonal = req.body.diagonal === true || req.body.diagonal === 'true'; // Diagonal option
+    const repeat = req.body.repeat === true || req.body.repeat === 'true'; // Repeat option
+    const repeatCount = parseInt(req.body.repeatCount) || 5; // Number of times to repeat (default 5)
+    
     const pdfBytes = fs.readFileSync(filePath);
     const pdfDoc = await PDFDocument.load(pdfBytes);
-    const font = await pdfDoc.embedFont("Helvetica-Bold");
+    const font = await pdfDoc.embedFont(fontFamily);
 
     let textColor;
     switch (color) {
@@ -64,6 +68,10 @@ const addWatermark = async (req, res) => {
       case "blue": textColor = rgb(0, 0, 1); break;
       case "green": textColor = rgb(0, 0.5, 0); break;
       case "black": textColor = rgb(0, 0, 0); break;
+      case "white": textColor = rgb(1, 1, 1); break;
+      case "yellow": textColor = rgb(1, 1, 0); break;
+      case "purple": textColor = rgb(0.5, 0, 0.5); break;
+      case "orange": textColor = rgb(1, 0.65, 0); break;
       default: textColor = rgb(0.5, 0.5, 0.5);
     }
 
@@ -72,63 +80,89 @@ const addWatermark = async (req, res) => {
     pages.forEach(page => {
       const { width, height } = page.getSize();
       const textWidth = font.widthOfTextAtSize(watermarkText, fontSize);
+      
+      // Calculate diagonal text dimensions if needed
+      let diagonalTextWidth = textWidth;
+      let diagonalTextHeight = fontSize;
+      if (diagonal) {
+        // Approximate diagonal dimensions for rotated text
+        diagonalTextWidth = Math.sqrt(textWidth * textWidth + fontSize * fontSize);
+        diagonalTextHeight = diagonalTextWidth;
+      }
 
-      let x, y;
-
-      switch (position) {
-        case "top-left":
-          x = 50; y = height - 100; break;
-        case "top-right":
-          x = width - textWidth - 50; y = height - 100; break;
-        case "bottom-left":
-          x = 50; y = 100; break;
-        case "bottom-right":
-          x = width - textWidth - 50; y = 100; break;
-        case "repeat":
-          // Draw watermarks in multiple positions
-          const positions = [
-            { x: width / 2 - textWidth / 2, y: height / 2 },
-            { x: 50, y: height - 100 },
-            { x: width - textWidth - 50, y: height - 100 },
-            { x: 50, y: 100 },
-            { x: width - textWidth - 50, y: 100 }
-          ];
-          positions.forEach(pos => {
-            page.drawText(watermarkText, {
-              x: pos.x,
-              y: pos.y,
+      // Handle different position and repetition scenarios
+      if (repeat) {
+        // Calculate appropriate spacing based on repeatCount
+        const rows = Math.ceil(Math.sqrt(repeatCount));
+        const cols = Math.ceil(repeatCount / rows);
+        
+        const spacingX = width / cols;
+        const spacingY = height / rows;
+        
+        let drawnCount = 0;
+        for (let row = 0; row < rows && drawnCount < repeatCount; row++) {
+          for (let col = 0; col < cols && drawnCount < repeatCount; col++) {
+            if (drawnCount >= repeatCount) break;
+            
+            const x_pos = col * spacingX + spacingX / 4; // Add some offset from edges
+            const y_pos = height - (row * spacingY + spacingY / 2); // Adjust for PDF coordinate system
+            
+            let options = {
+              x: x_pos,
+              y: y_pos,
               size: fontSize,
               font,
               color: textColor,
               opacity,
-            });
-          });
-          return;
-        case "diagonal":
-          page.drawText(watermarkText, {
-            x: width / 2 - textWidth / 2,
-            y: height / 2,
-            size: fontSize,
-            font,
-            color: textColor,
-            opacity,
-            rotate: degrees(-45),
-          });
-          return;
-        case "center":
-        default:
-          x = (width - textWidth) / 2;
-          y = height / 2;
+            };
+            
+            if (diagonal) {
+              options.rotate = degrees(-45);
+            }
+            
+            page.drawText(watermarkText, options);
+            drawnCount++;
+          }
+        }
+      } else if (diagonal) {
+        // Draw single diagonal watermark
+        page.drawText(watermarkText, {
+          x: width / 2 - diagonalTextWidth / 2,
+          y: height / 2,
+          size: fontSize,
+          font,
+          color: textColor,
+          opacity,
+          rotate: degrees(-45),
+        });
+      } else {
+        // Standard position handling
+        let x, y;
+        
+        switch (position) {
+          case "top-left":
+            x = 50; y = height - 100; break;
+          case "top-right":
+            x = width - textWidth - 50; y = height - 100; break;
+          case "bottom-left":
+            x = 50; y = 100; break;
+          case "bottom-right":
+            x = width - textWidth - 50; y = 100; break;
+          case "center":
+          default:
+            x = (width - textWidth) / 2;
+            y = height / 2;
+        }
+        
+        page.drawText(watermarkText, {
+          x,
+          y,
+          size: fontSize,
+          font,
+          color: textColor,
+          opacity,
+        });
       }
-
-      page.drawText(watermarkText, {
-        x,
-        y,
-        size: fontSize,
-        font,
-        color: textColor,
-        opacity,
-      });
     });
 
     const output = await pdfDoc.save();
