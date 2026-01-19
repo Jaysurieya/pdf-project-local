@@ -9,20 +9,13 @@ function App() {
   return (
     <Routes>
       <Route path="/" element={<DashboardMain />} />
-
-      {/* SPECIAL ROUTE */}
       <Route path="/tool/scan-to-pdf" element={<ScanToPdf />} />
-
-      {/* GENERIC ROUTE FOR ALL OTHER TOOLS */}
       <Route path="/tool/:tool" element={<Upload />} />
-
-      {/* MOBILE CAMERA ROUTE */}
       <Route path="/mobile-scan" element={<MobileScan />} />
-
-      {/* DESKTOP SCAN VIEW ROUTE */}
       <Route path="/scan-desktop" element={<ScanDesktopView />} />
     </Routes>
   )
 }
 
 export default App
+
