@@ -1,21 +1,32 @@
 const express = require("express");
 const multer = require("multer");
-const path = require("path");
 const { scanPDF } = require("../Controllers/optimize.controller");
+const { compressPdfController } = require("../Controllers/compress.controller");
 
 const router = express.Router();
 
-// storage for uploaded pdf
-const storage = multer.diskStorage({
+/* ---------------- OCR (disk storage – existing) ---------------- */
+
+const diskStorage = multer.diskStorage({
   destination: "uploads/",
   filename: (req, file, cb) => {
     cb(null, Date.now() + "-" + file.originalname);
   },
 });
 
-const upload = multer({ storage });
+const uploadDisk = multer({ storage: diskStorage });
 
-// Route
-router.post("/ocr", upload.single("file"), scanPDF);
+router.post("/ocr", uploadDisk.single("file"), scanPDF);
+
+/* ---------------- PDF Compression (NO storage) ---------------- */
+
+// memory storage → no pdf saved
+const uploadMemory = multer({ storage: multer.memoryStorage() });
+
+router.post(
+  "/compress",
+  uploadMemory.single("file"),
+  compressPdfController
+);
 
 module.exports = router;

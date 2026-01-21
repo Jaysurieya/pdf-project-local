@@ -47,7 +47,13 @@ export const TOOLS = {
     accept: ".pdf",
     multiple: false,
     toolKey: "compress_pdf",
-    backendRoute: "/api/optimize/compress"
+    backendRoute: "/api/optimize/compress",
+    hasOptions: true,
+    options: [
+      { value: "low", label: "Low Compression (Recommended)" },
+      { value: "medium", label: "Medium Compression" },
+      { value: "high", label: "High Compression" }
+    ]
   },
   "repair-pdf": {
     title: "Repair PDF",
@@ -126,13 +132,6 @@ export const TOOLS = {
     multiple: false,
     toolKey: "pdf_to_excel",
     backendRoute: "/api/convert/from-pdf/excel"
-  },
-  "pdf-to-pdfa": {
-    title: "PDF to PDF/A",
-    accept: ".pdf",
-    multiple: false,
-    toolKey: "pdf_to_pdfa",
-    backendRoute: "/api/convert/from-pdf/pdfa"
   },
 
   // ======================

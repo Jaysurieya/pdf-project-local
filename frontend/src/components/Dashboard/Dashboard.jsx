@@ -19,7 +19,7 @@ function Dashboard() {
     },
     {
       title: "CONVERT FROM PDF",
-      tools: ["PDF to JPG", "PDF to Word", "PDF to Excel", "PDF to PDF/A"]
+      tools: ["PDF to JPG", "PDF to Word", "PDF to Excel"]
     },
     {
       title: "EDIT PDF",
@@ -80,7 +80,6 @@ function Dashboard() {
                     "PDF to JPG": "pdf-to-jpg",
                     "PDF to Word": "pdf-to-word",
                     "PDF to Excel": "pdf-to-excel",
-                    "PDF to PDF/A": "pdf-to-pdfa",
                     
                     // EDIT PDF
                     "Rotate PDF": "rotate-pdf",

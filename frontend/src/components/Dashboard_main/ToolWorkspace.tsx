@@ -48,7 +48,6 @@ const ToolWorkspace: React.FC<ToolWorkspaceProps> = ({ tool, onBack }) => {
           'pdf-to-word': ['.pdf'],
           'powerpoint-to-pdf': ['.ppt', '.pptx'],
           'pdf-to-excel': ['.pdf'],
-          'pdf-to-pdfa': ['.pdf'],
           'word-to-pdf': ['.doc', '.docx'],
           'pdf-to-jpg': ['.pdf'],
           'edit-pdf': ['.pdf'],

@@ -111,8 +111,14 @@ function Upload() {
     const formData = new FormData();
     formData.append("tool", config.toolKey);
 
+    // For compression tool, use "file" field name to match backend expectation
+    if (config.toolKey === "compress_pdf") {
+      formData.append("file", files[0]);
+    } else {
+      files.forEach((f) => formData.append("files", f));
+    }
+
     if (password) formData.append("password", password);
-    files.forEach((f) => formData.append("files", f));
 
     try {
       const res = await fetch(

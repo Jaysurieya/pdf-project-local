@@ -12,6 +12,7 @@
   "description": "",
   "dependencies": {
     "archiver": "^7.0.1",
+    "compress-pdf": "^0.5.6",
     "cors": "^2.8.5",
     "diff": "^8.0.2",
     "express": "^5.2.1",

@@ -121,16 +121,6 @@ export const TOOLS: PDFTool[] = [
     keywords: ['xls', 'xlsx', 'spreadsheet', 'csv', 'table', 'data']
   },
   { 
-    id: 'pdf-to-pdfa', 
-    title: 'PDF to PDF/A', 
-    description: 'Convert your PDF to PDF/A format for long-term archiving and compliance.', 
-    icon: FileArchive, 
-    category: 'convert', 
-    color: 'text-amber-600 dark:text-amber-400 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 group-hover:border-slate-200 dark:group-hover:border-slate-700',
-    glow: 'bg-amber-500',
-    keywords: ['archive', 'compliance', 'long-term', 'standard', 'pdfa']
-  },
-  { 
     id: 'word-to-pdf', 
     title: 'Word to PDF', 
     description: 'Make DOC and DOCX files into easy to read PDF documents.', 
