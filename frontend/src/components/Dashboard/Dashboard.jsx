@@ -11,7 +11,7 @@ function Dashboard() {
     },
     {
       title: "OPTIMIZE PDF",
-      tools: ["Compress PDF", "Repair PDF", "OCR PDF"]
+      tools: ["Compress PDF", "OCR PDF"]
     },
     {
       title: "CONVERT TO PDF",
@@ -66,7 +66,6 @@ function Dashboard() {
                     
                     // OPTIMIZE PDF
                     "Compress PDF": "compress-pdf",
-                    "Repair PDF": "repair-pdf",
                     "OCR PDF": "ocr-pdf",
                     
                     // CONVERT TO PDF

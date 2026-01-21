@@ -64,7 +64,6 @@ const ToolWorkspace: React.FC<ToolWorkspaceProps> = ({ tool, onBack }) => {
           'scan-to-pdf': ['.jpg', '.jpeg', '.png'],
           'organize-pdf': ['.pdf'],
           'remove-pages': ['.pdf'],
-          'repair-pdf': ['.pdf'],
           'ocr-pdf': ['.pdf'],
         };
         

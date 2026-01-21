@@ -38,11 +38,8 @@ const NavbarUse = () => {
             <NavbarLogo />
             <NavItems items={navItems} onItemClick={handleItemClick} />
             <div className="flex items-center gap-2 relative z-20">
-              <NavbarButton variant="secondary" href="#login">
-                Login
-              </NavbarButton>
-              <NavbarButton variant="primary" href="#signup">
-                Sign Up
+              <NavbarButton variant="primary" href="#tools">
+                Explore Tools
               </NavbarButton>
             </div>
           </NavBody>
@@ -67,12 +64,9 @@ const NavbarUse = () => {
                 {item.name}
               </a>
             ))}
-            <div className="flex w-full flex-col gap-2 pt-4 border-t border-gray-200">
-              <NavbarButton variant="secondary" href="#login" className="w-full">
-                Login
-              </NavbarButton>
-              <NavbarButton variant="primary" href="#signup" className="w-full">
-                Sign Up
+            <div className="pt-4 border-t border-gray-200">
+              <NavbarButton variant="primary" href="#tools" className="w-full">
+                Explore Tools
               </NavbarButton>
             </div>
           </MobileNavMenu>

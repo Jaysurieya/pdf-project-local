@@ -71,16 +71,6 @@ export const TOOLS: PDFTool[] = [
     keywords: ['reduce', 'shrink', 'optimize', 'size', 'minify']
   },
   { 
-    id: 'repair-pdf', 
-    title: 'Repair PDF', 
-    description: 'Repair corrupted or damaged PDF files.', 
-    icon: FileArchive, 
-    category: 'optimize', 
-    color: 'text-emerald-600 dark:text-emerald-400 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 group-hover:border-slate-200 dark:group-hover:border-slate-700',
-    glow: 'bg-emerald-500',
-    keywords: ['repair', 'fix', 'recover', 'corrupted']
-  },
-  { 
     id: 'ocr-pdf', 
     title: 'OCR PDF', 
     description: 'Apply OCR technology to make scanned PDFs searchable and editable.', 

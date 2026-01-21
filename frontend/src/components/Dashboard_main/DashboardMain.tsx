@@ -12,15 +12,13 @@ import { PDFTool } from './types';
 
 const DashboardMain = () => {
   const navigate = useNavigate();
-  const [currentPage, setCurrentPage] = useState<'home' | 'login'>('home');
 
   const handleToolSelect = (tool: PDFTool) => {
     // Navigate to the upload page for the selected tool
     navigate(`/tool/${tool.id}`);
   };
 
-  const handleNavigate = (page: 'home' | 'login') => {
-    setCurrentPage(page);
+  const handleNavigate = (page: 'home') => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -29,44 +27,14 @@ const DashboardMain = () => {
   return (
     // Removed 'bg-white' and 'dark:bg-slate-950' to allow the body's 'aurora-bg' to control global theme
     <div className="min-h-screen bg-white dark:bg-[#0B1220] transition-colors duration-300 relative z-0">
-      <Navbar currentPage={currentPage} onNavigate={handleNavigate} />
+      <Navbar onNavigate={handleNavigate} />
       
       <main>
-        <AnimatePresence mode="wait">
-          {currentPage === 'login' ? (
-             <motion.div
-              key="login"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.3 }}
-            >
-              <div className="p-8 text-center">
-                <h2>Login Page Placeholder</h2>
-                <button 
-                  onClick={() => handleNavigate('home')} 
-                  className="mt-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-                >
-                  Back to Home
-                </button>
-              </div>
-            </motion.div>
-          ) : (
-            <motion.div
-              key="home"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.3 }}
-            >
-              <Hero />
-              <Tools onToolSelect={handleToolSelect} />
-              <Features />
-              <Footer />
-              <AIAssistant />
-            </motion.div>
-          )}
-        </AnimatePresence>
+        <Hero />
+        <Tools onToolSelect={handleToolSelect} />
+        <Features />
+        <Footer />
+        <AIAssistant />
       </main>
     </div>
   );

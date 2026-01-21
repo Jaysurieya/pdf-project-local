@@ -9,11 +9,10 @@ const MotionNav = motion.nav as any;
 const MotionButton = motion.button as any;
 
 interface NavbarProps {
-  onNavigate: (page: 'home' | 'login') => void;
-  currentPage: 'home' | 'login';
+  onNavigate: (page: 'home') => void;
 }
 
-const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage }) => {
+const Navbar: React.FC<NavbarProps> = ({ onNavigate }) => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const { scrollY } = useScroll();
@@ -33,36 +32,15 @@ const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage }) => {
   const handleNavigation = (target: string) => {
     setIsMobileMenuOpen(false);
     
-    if (target === 'login') {
-      onNavigate('login');
+    if (target === 'top') {
       window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
-
-    if (currentPage === 'login') {
-      onNavigate('home');
-      // Allow state update to render home before scrolling
-      setTimeout(() => {
-         const el = document.getElementById(target === 'top' ? 'hero-section' : target);
-         if (el) {
-            const offset = 100;
-            const elementPosition = el.getBoundingClientRect().top + window.scrollY;
-            window.scrollTo({ top: target === 'top' ? 0 : elementPosition - offset, behavior: 'smooth' });
-         } else {
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-         }
-      }, 100);
-    } else {
-      if (target === 'top') {
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-        return;
-      }
-      const el = document.getElementById(target);
-      if (el) {
-        const offset = 120;
-        const elementPosition = el.getBoundingClientRect().top + window.scrollY;
-        window.scrollTo({ top: elementPosition - offset, behavior: 'smooth' });
-      }
+    const el = document.getElementById(target);
+    if (el) {
+      const offset = 120;
+      const elementPosition = el.getBoundingClientRect().top + window.scrollY;
+      window.scrollTo({ top: elementPosition - offset, behavior: 'smooth' });
     }
   };
 
@@ -170,16 +148,10 @@ const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage }) => {
             <div className="h-4 w-px bg-slate-200 dark:bg-slate-700 mx-1 hidden md:block" />
 
             <div className="hidden md:flex items-center gap-2">
-              <button 
-                onClick={() => handleNavigation('login')}
-                className="text-sm font-bold text-slate-600 dark:text-slate-300 hover:text-[#0061ff] dark:hover:text-white transition-colors px-3 py-2 rounded-full hover:bg-blue-50 dark:hover:bg-blue-900/20"
-              >
-                Log in
-              </button>
               <MotionButton
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                onClick={() => handleNavigation('login')}
+                onClick={() => handleNavigation('tools')}
                 className="px-5 py-2 bg-gradient-to-r from-blue-600 to-cyan-500 text-white text-sm font-bold rounded-full shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 transition-shadow"
               >
                 Get Started
@@ -253,20 +225,12 @@ const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage }) => {
               </div>
 
               <div className="mt-8 pt-8 border-t border-slate-200 dark:border-slate-800">
-                <div className="grid grid-cols-2 gap-4">
-                  <button 
-                    onClick={() => handleNavigation('login')}
-                    className="py-4 rounded-xl font-bold text-slate-700 dark:text-white border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
-                  >
-                    Log in
-                  </button>
-                  <button 
-                    onClick={() => handleNavigation('login')}
-                    className="py-4 rounded-xl font-bold text-white bg-gradient-to-r from-blue-600 to-cyan-500 hover:shadow-lg hover:shadow-blue-500/25 transition-all"
-                  >
-                    Sign up
-                  </button>
-                </div>
+                <button 
+                  onClick={() => handleNavigation('tools')}
+                  className="w-full py-4 rounded-xl font-bold text-white bg-gradient-to-r from-blue-600 to-cyan-500 hover:shadow-lg hover:shadow-blue-500/25 transition-all"
+                >
+                  Explore Tools
+                </button>
                 
                 <button 
                   onClick={toggleTheme}

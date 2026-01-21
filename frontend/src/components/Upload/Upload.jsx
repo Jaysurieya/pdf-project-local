@@ -96,15 +96,19 @@ function Upload() {
   /* -------------------- FILE HANDLING -------------------- */
   const handleFileChange = (e) => {
     const selected = Array.from(e.target.files);
+    processFiles(selected);
+    e.target.value = "";
+  };
 
+  const processFiles = (selectedFiles) => {
     if (config.multiple) {
       setFiles((prev) => {
         const map = new Map(prev.map(f => [`${f.name}-${f.size}`, f]));
-        selected.forEach(f => map.set(`${f.name}-${f.size}`, f));
+        selectedFiles.forEach(f => map.set(`${f.name}-${f.size}`, f));
         return Array.from(map.values());
       });
     } else {
-      setFiles(selected.slice(0, 1));
+      setFiles(selectedFiles.slice(0, 1));
     }
 
     // Reset signature-related states when new file is uploaded
@@ -113,8 +117,41 @@ function Upload() {
       setPlacements([]);
       setSignatureData(null);
     }
+  };
 
-    e.target.value = "";
+  // Drag and drop handlers
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      const droppedFiles = Array.from(e.dataTransfer.files);
+      // Filter files based on accepted types
+      const filteredFiles = droppedFiles.filter(file => {
+        const fileType = file.type;
+        const fileName = file.name.toLowerCase();
+        const acceptedTypes = config.accept.split(',').map(type => type.trim());
+        
+        return acceptedTypes.some(acceptedType => {
+          if (acceptedType.startsWith('.')) {
+            // Check file extension
+            return fileName.endsWith(acceptedType.toLowerCase());
+          } else {
+            // Check MIME type
+            return fileType === acceptedType || fileType.startsWith(acceptedType.split('/')[0] + '/');
+          }
+        });
+      });
+      
+      if (filteredFiles.length > 0) {
+        processFiles(filteredFiles);
+      }
+    }
   };
 
   const removeFile = (index) => {
@@ -307,6 +344,8 @@ function Upload() {
                 />
                 <label 
                   htmlFor="file-upload"
+                  onDragOver={handleDragOver}
+                  onDrop={handleDrop}
                   className="flex flex-col items-center justify-center w-full h-40 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-2xl cursor-pointer bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors duration-300"
                 >
                   <div className="flex flex-col items-center justify-center pt-5 pb-6">

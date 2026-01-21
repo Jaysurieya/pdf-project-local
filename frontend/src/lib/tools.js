@@ -55,13 +55,7 @@ export const TOOLS = {
       { value: "high", label: "High Compression" }
     ]
   },
-  "repair-pdf": {
-    title: "Repair PDF",
-    accept: ".pdf",
-    multiple: false,
-    toolKey: "repair_pdf",
-    backendRoute: "/api/optimize/repair"
-  },
+
   "ocr-pdf": {
     title: "OCR PDF",
     accept: ".pdf",
