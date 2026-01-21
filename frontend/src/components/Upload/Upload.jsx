@@ -433,9 +433,7 @@ function Upload() {
                 )}
               </>
             )}
-            {config.toolKey === "redact_pdf" && files[0] && (
-              <RedactPdfPreview ref={redactRef} file={files[0]} />
-            )}
+
 
 
             {hasOptions && (
@@ -1008,6 +1006,17 @@ function Upload() {
               </button>
             )}
 
+          </div>
+        </div>
+        
+
+      )}
+      
+      {/* Redact PDF Preview - Outside main container to allow full width */}
+      {config.toolKey === "redact_pdf" && files[0] && (
+        <div className="w-full overflow-x-auto mt-8">
+          <div className="min-w-max flex justify-center">
+            <RedactPdfPreview ref={redactRef} file={files[0]} />
           </div>
         </div>
       )}
