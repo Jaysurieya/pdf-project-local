@@ -1,51 +1,56 @@
-  const { spawn } = require("child_process");
+const { spawn } = require("child_process");
 
-  exports.compressPdfController = (req, res) => {
-    try {
-      const level = req.body.level; // low | medium | high
-      const pdfBuffer = req.file.buffer;
+exports.compressPdfController = (req, res) => {
+  try {
+    const level = req.body.level; // low | medium | high
+    const pdfBuffer = req.file.buffer;
 
-      const qualityMap = {
-        low: "/screen",
-        medium: "/ebook",
-        high: "/printer",
-      };
+    const qualityMap = {
+      low: "/screen",
+      medium: "/ebook",
+      high: "/printer",
+    };
 
-      const quality = qualityMap[level] || "/ebook";
+    const quality = qualityMap[level] || "/ebook";
 
-      const gs = spawn("gswin64c", [
-        "-sDEVICE=pdfwrite",
-        "-dCompatibilityLevel=1.4",
-        `-dPDFSETTINGS=${quality}`,
-        "-dNOPAUSE",
-        "-dQUIET",
-        "-dBATCH",
-        "-sOutputFile=-", // stdout
-        "-",              // stdin
-      ]);
+    // ✅ Detect OS-safe Ghostscript binary
+    const gsCommand = process.platform === "win32" ? "gswin64c" : "gs";
+    console.log("Using Ghostscript command:", gsCommand);
+    const gs = spawn(gsCommand, [
+      "-sDEVICE=pdfwrite",
+      "-dCompatibilityLevel=1.4",
+      `-dPDFSETTINGS=${quality}`,
+      "-dNOPAUSE",
+      "-dQUIET",
+      "-dBATCH",
+      "-sOutputFile=-", // output to stdout
+      "-",              // input from stdin
+    ]);
 
-      res.setHeader("Content-Type", "application/pdf");
-      res.setHeader(
-        "Content-Disposition",
-        "attachment; filename=compressed.pdf"
-      );
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader(
+      "Content-Disposition",
+      "attachment; filename=compressed.pdf"
+    );
 
-      gs.stdout.pipe(res);
+    // pipe compressed PDF to response
+    gs.stdout.pipe(res);
 
-      gs.stderr.on("data", (data) => {
-        console.error("GS error:", data.toString());
-      });
+    gs.stderr.on("data", (data) => {
+      console.error("Ghostscript error:", data.toString());
+    });
 
-      gs.on("error", () => {
-        res.status(500).send("Compression failed");
-      });
+    gs.on("error", (err) => {
+      console.error("GS spawn failed:", err);
+      res.status(500).send("Compression failed");
+    });
 
-      // send pdf buffer to ghostscript
-      gs.stdin.write(pdfBuffer);
-      gs.stdin.end();
+    // send PDF buffer to Ghostscript
+    gs.stdin.write(pdfBuffer);
+    gs.stdin.end();
 
-    } catch (err) {
-      console.error(err);
-      res.status(500).json({ error: "PDF compression failed" });
-    }
-  };
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "PDF compression failed" });
+  }
+};
