@@ -50,9 +50,9 @@ export const TOOLS = {
     backendRoute: "/api/optimize/compress",
     hasOptions: true,
     options: [
-      { value: "low", label: "Low Compression (Recommended)" },
-      { value: "medium", label: "Medium Compression" },
-      { value: "high", label: "High Compression" }
+      { value: "high", label: "High Compress: Smallest file size", description: "Maximum compression, smallest output file" },
+      { value: "medium", label: "Medium Compress: Balanced quality & size", description: "Balanced compression between quality and file size" },
+      { value: "low", label: "Low Compress: Best quality, larger size", description: "Minimum compression, preserves highest quality" }
     ]
   },
 

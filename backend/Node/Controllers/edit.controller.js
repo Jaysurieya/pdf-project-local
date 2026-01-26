@@ -182,56 +182,185 @@ const addWatermark = async (req, res) => {
 };
 
 /* ---------------------------------- CROP PDF --------------------------------- */
-const cropPdf = async (req, res) => {
-  try {
-    // Validate that only one file was uploaded
-    if (!req.file) {
-      return res.status(400).json({
-        message: "No file uploaded",
-      });
-    }
+// const cropPdf = async (req, res) => {
+//   try {
+//     // Validate that only one file was uploaded
+//     if (!req.file) {
+//       return res.status(400).json({
+//         message: "No file uploaded",
+//       });
+//     }
     
-    const filePath = req.file.path;
+//     const filePath = req.file.path;
 
-    const left = parseFloat(req.body.cropLeft) || parseFloat(req.body.left) || 0;
-    const right = parseFloat(req.body.cropRight) || parseFloat(req.body.right) || 0;
-    const top = parseFloat(req.body.cropTop) || parseFloat(req.body.top) || 0;
-    const bottom = parseFloat(req.body.cropBottom) || parseFloat(req.body.bottom) || 0;
+//     const left = parseFloat(req.body.cropLeft) || parseFloat(req.body.left) || 0;
+//     const right = parseFloat(req.body.cropRight) || parseFloat(req.body.right) || 0;
+//     const top = parseFloat(req.body.cropTop) || parseFloat(req.body.top) || 0;
+//     const bottom = parseFloat(req.body.cropBottom) || parseFloat(req.body.bottom) || 0;
+
+//     const pdfBytes = fs.readFileSync(filePath);
+//     const pdfDoc = await PDFDocument.load(pdfBytes);
+
+//     const pages = pdfDoc.getPages();
+//     if (pages.length !== 1) {
+//       return res.status(400).json({
+//         message: "Crop supports only single-page PDFs",
+//       });
+//     }
+
+//     const page = pages[0];
+//     const { width, height } = page.getSize();
+
+//     const newWidth = width * (1 - (left + right) / 100);
+//     const newHeight = height * (1 - (top + bottom) / 100);
+
+//     const embedded = await pdfDoc.embedPage(page, {
+//       left: (left / 100) * width,
+//       right: width - (right / 100) * width,
+//       top: height - (top / 100) * height,
+//       bottom: (bottom / 100) * height,
+//     });
+
+//     pdfDoc.removePage(0);
+//     const newPage = pdfDoc.addPage([newWidth, newHeight]);
+
+//     newPage.drawPage(embedded, {
+//       x: 0,
+//       y: 0,
+//       width: newWidth,
+//       height: newHeight,
+//     });
+
+//     const croppedPdf = await pdfDoc.save();
+//     fs.unlinkSync(filePath);
+
+//     res.setHeader("Content-Type", "application/pdf");
+//     res.setHeader("Content-Disposition", "attachment; filename=cropped.pdf");
+//     res.send(Buffer.from(croppedPdf));
+//   } catch (err) {
+//     console.error("Crop PDF Error:", err);
+//     // Clean up the uploaded file in case of error
+//     if (filePath && fs.existsSync(filePath)) {
+//       fs.unlinkSync(filePath);
+//     }
+//     res.status(500).json({ message: "Crop PDF failed", error: err.message });
+//   }
+// };
+
+/* ---------------------------------- CROP PDF (MULTI PAGE SUPPORT) --------------------------------- */
+const cropPdf = async (req, res) => {
+  let filePath; // ✅ define here so catch can access
+
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: "No file uploaded" });
+    }
+
+    filePath = req.file.path;
 
     const pdfBytes = fs.readFileSync(filePath);
     const pdfDoc = await PDFDocument.load(pdfBytes);
-
     const pages = pdfDoc.getPages();
-    if (pages.length !== 1) {
-      return res.status(400).json({
-        message: "Crop supports only single-page PDFs",
+
+    if (!pages || pages.length === 0) {
+      return res.status(400).json({ message: "PDF has no pages" });
+    }
+
+    // ✅ Mode selector: "all" | "page"
+    // default = all
+    const cropMode = (req.body.cropMode || "all").toLowerCase();
+
+    // ✅ Option A: SAME crop for all pages
+    const globalCrop = {
+      left: parseFloat(req.body.cropLeft) || parseFloat(req.body.left) || 0,
+      right: parseFloat(req.body.cropRight) || parseFloat(req.body.right) || 0,
+      top: parseFloat(req.body.cropTop) || parseFloat(req.body.top) || 0,
+      bottom: parseFloat(req.body.cropBottom) || parseFloat(req.body.bottom) || 0,
+    };
+
+    // ✅ Option B: Page-by-page crop configs
+    // expects JSON string:
+    // [
+    //   {"page":1,"left":10,"right":10,"top":5,"bottom":5},
+    //   {"page":2,"left":0,"right":0,"top":10,"bottom":0}
+    // ]
+    let perPageCrop = [];
+    if (req.body.perPageCrop) {
+      try {
+        perPageCrop = JSON.parse(req.body.perPageCrop);
+      } catch (err) {
+        return res.status(400).json({
+          message: "Invalid perPageCrop JSON format",
+        });
+      }
+    }
+
+    // ✅ helper function to pick crop for each page
+    const getCropForPage = (pageIndex) => {
+      if (cropMode === "page") {
+        const pageNumber = pageIndex + 1; // 1-based for frontend
+        const cfg = perPageCrop.find((p) => p.page === pageNumber);
+
+        if (cfg) {
+          return {
+            left: parseFloat(cfg.left || 0),
+            right: parseFloat(cfg.right || 0),
+            top: parseFloat(cfg.top || 0),
+            bottom: parseFloat(cfg.bottom || 0),
+          };
+        }
+        // if no config given for this page -> no crop
+        return { left: 0, right: 0, top: 0, bottom: 0 };
+      }
+
+      // default mode = apply same crop to all pages
+      return globalCrop;
+    };
+
+    // ✅ create a new PDF
+    const newPdfDoc = await PDFDocument.create();
+
+    for (let i = 0; i < pages.length; i++) {
+      const page = pages[i];
+      const { width, height } = page.getSize();
+
+      const crop = getCropForPage(i);
+
+      const leftPx = (crop.left / 100) * width;
+      const rightPx = (crop.right / 100) * width;
+      const topPx = (crop.top / 100) * height;
+      const bottomPx = (crop.bottom / 100) * height;
+
+      const newWidth = width - leftPx - rightPx;
+      const newHeight = height - topPx - bottomPx;
+
+      if (newWidth <= 0 || newHeight <= 0) {
+        return res.status(400).json({
+          message: `Invalid crop values for page ${i + 1}: results in negative/zero size`,
+        });
+      }
+
+      // ✅ embed the old page with clipping
+      const embeddedPage = await newPdfDoc.embedPage(page, {
+        left: leftPx,
+        right: width - rightPx,
+        top: height - topPx,
+        bottom: bottomPx,
+      });
+
+      const newPage = newPdfDoc.addPage([newWidth, newHeight]);
+
+      newPage.drawPage(embeddedPage, {
+        x: 0,
+        y: 0,
+        width: newWidth,
+        height: newHeight,
       });
     }
 
-    const page = pages[0];
-    const { width, height } = page.getSize();
+    const croppedPdf = await newPdfDoc.save();
 
-    const newWidth = width * (1 - (left + right) / 100);
-    const newHeight = height * (1 - (top + bottom) / 100);
-
-    const embedded = await pdfDoc.embedPage(page, {
-      left: (left / 100) * width,
-      right: width - (right / 100) * width,
-      top: height - (top / 100) * height,
-      bottom: (bottom / 100) * height,
-    });
-
-    pdfDoc.removePage(0);
-    const newPage = pdfDoc.addPage([newWidth, newHeight]);
-
-    newPage.drawPage(embedded, {
-      x: 0,
-      y: 0,
-      width: newWidth,
-      height: newHeight,
-    });
-
-    const croppedPdf = await pdfDoc.save();
+    // delete uploaded file
     fs.unlinkSync(filePath);
 
     res.setHeader("Content-Type", "application/pdf");
@@ -239,13 +368,16 @@ const cropPdf = async (req, res) => {
     res.send(Buffer.from(croppedPdf));
   } catch (err) {
     console.error("Crop PDF Error:", err);
-    // Clean up the uploaded file in case of error
+
+    // ✅ cleanup
     if (filePath && fs.existsSync(filePath)) {
       fs.unlinkSync(filePath);
     }
+
     res.status(500).json({ message: "Crop PDF failed", error: err.message });
   }
 };
+
 
 /* ------------------------------ BASIC EDIT PDF -------------------------------- */
 const basicEditPdf = async (req, res) => {

@@ -213,8 +213,8 @@
 //     </div>
 //   );
 // }
-
-
+// #################################################################################
+ 
 import { useEffect, useState, useRef, forwardRef, useImperativeHandle } from "react";
 import pdfjsLib from "../../lib/pdf";
 import { jsPDF } from "jspdf";
@@ -373,3 +373,242 @@ const RedactPdfPreview = forwardRef(({ file }, ref) => {
 });
 
 export default RedactPdfPreview;
+
+
+// ###########################################
+
+// import {
+//   useEffect,
+//   useState,
+//   useRef,
+//   forwardRef,
+//   useImperativeHandle,
+// } from "react";
+// import pdfjsLib from "../../lib/pdf";
+// import { jsPDF } from "jspdf";
+// import RedactionBox from "./RedactionBox";
+
+// const RedactPdfPreview = forwardRef(({ file }, ref) => {
+//   const [pages, setPages] = useState([]);
+//   const [textItems, setTextItems] = useState([]);
+//   const [rects, setRects] = useState([]);
+//   const [activeRect, setActiveRect] = useState(null);
+//   const [pageSizes, setPageSizes] = useState([]);
+
+//   const [searchQuery, setSearchQuery] = useState("");
+
+//   const canvasRefs = useRef([]);
+//   const originalImagesRef = useRef([]); // 🔥 to restore
+
+//   useImperativeHandle(ref, () => ({
+//     applyRedaction,
+//     downloadRedactedPdf,
+//     resetRedactions,
+//     resetAll,
+//   }));
+
+//   useEffect(() => {
+//     if (!file) return;
+
+//     // reset everything on new upload
+//     resetAll();
+
+//     const reader = new FileReader();
+//     reader.onload = async () => {
+//       const pdf = await pdfjsLib.getDocument({
+//         data: new Uint8Array(reader.result),
+//       }).promise;
+
+//       const pageImages = [];
+//       const extracted = [];
+//       const sizes = [];
+
+//       for (let i = 1; i <= pdf.numPages; i++) {
+//         const page = await pdf.getPage(i);
+//         const viewport = page.getViewport({ scale: 1.5 });
+
+//         sizes.push({ width: viewport.width, height: viewport.height });
+
+//         const canvas = document.createElement("canvas");
+//         canvas.width = viewport.width;
+//         canvas.height = viewport.height;
+
+//         await page.render({
+//           canvasContext: canvas.getContext("2d"),
+//           viewport,
+//         }).promise;
+
+//         const img = canvas.toDataURL();
+//         pageImages.push(img);
+
+//         const text = await page.getTextContent();
+//         text.items.forEach((t) => {
+//           const tr = pdfjsLib.Util.transform(viewport.transform, t.transform);
+//           extracted.push({
+//             page: i - 1,
+//             text: t.str,
+//             x: tr[4],
+//             y: tr[5] - t.height * viewport.scale,
+//             width: t.width * viewport.scale,
+//             height: t.height * viewport.scale,
+//           });
+//         });
+//       }
+
+//       setPages(pageImages);
+//       setTextItems(extracted);
+//       setPageSizes(sizes);
+
+//       // keep original reference for reset
+//       originalImagesRef.current = pageImages;
+//     };
+
+//     reader.readAsArrayBuffer(file);
+//   }, [file]);
+
+//   const handleSearch = (q) => {
+//     setSearchQuery(q);
+
+//     if (!q) return setRects([]);
+//     const res = [];
+
+//     const query = q.toLowerCase();
+
+//     textItems.forEach((item) => {
+//       const text = item.text.toLowerCase();
+//       let i = text.indexOf(query);
+
+//       while (i !== -1) {
+//         const cw = item.text.length ? item.width / item.text.length : 0;
+
+//         res.push({
+//           id: Math.random(),
+//           page: item.page,
+//           x: item.x + i * cw,
+//           y: item.y,
+//           width: q.length * cw,
+//           height: item.height,
+//         });
+
+//         i = text.indexOf(query, i + 1);
+//       }
+//     });
+
+//     setRects(res);
+//   };
+
+//   const applyRedaction = () => {
+//     if (!rects.length) {
+//       alert("No redaction boxes found. Search something first.");
+//       return;
+//     }
+
+//     rects.forEach((r) => {
+//       const ctx = canvasRefs.current[r.page]?.getContext("2d");
+//       if (!ctx) return;
+
+//       ctx.fillStyle = "black";
+//       ctx.fillRect(r.x, r.y, r.width, r.height);
+//     });
+
+//     // allow user to search again & redact more
+//     setRects([]);
+//     setActiveRect(null);
+//     setSearchQuery("");
+//   };
+
+//   const downloadRedactedPdf = () => {
+//     const pdf = new jsPDF("p", "px", [800, 1100]);
+
+//     canvasRefs.current.forEach((c, i) => {
+//       const img = c.toDataURL("image/png");
+//       if (i) pdf.addPage();
+//       pdf.addImage(img, "PNG", 0, 0, 800, 1100);
+//     });
+
+//     pdf.save("redacted.pdf");
+//   };
+
+//   const resetRedactions = () => {
+//     // restore original canvas images
+//     canvasRefs.current.forEach((canvas, index) => {
+//       const ctx = canvas?.getContext("2d");
+//       if (!ctx) return;
+
+//       const img = new Image();
+//       img.src = originalImagesRef.current[index];
+
+//       img.onload = () => {
+//         ctx.clearRect(0, 0, canvas.width, canvas.height);
+//         ctx.drawImage(img, 0, 0);
+//       };
+//     });
+
+//     setRects([]);
+//     setActiveRect(null);
+//     setSearchQuery("");
+//   };
+
+//   const resetAll = () => {
+//     setPages([]);
+//     setTextItems([]);
+//     setRects([]);
+//     setActiveRect(null);
+//     setPageSizes([]);
+//     setSearchQuery("");
+//     canvasRefs.current = [];
+//     originalImagesRef.current = [];
+//   };
+
+//   return (
+//     <div className="w-full">
+//       <input
+//         placeholder="Search text to redact"
+//         value={searchQuery}
+//         onChange={(e) => handleSearch(e.target.value)}
+//         className="border p-2 w-full mb-4"
+//       />
+
+//       {pages.map((p, i) => (
+//         <div key={i} className="relative mt-4">
+//           <canvas
+//             ref={(el) => (canvasRefs.current[i] = el)}
+//             width={pageSizes[i]?.width}
+//             height={pageSizes[i]?.height}
+//           />
+
+//           <img
+//             src={p}
+//             style={{ display: "none" }}
+//             onLoad={(e) => {
+//               const canvas = canvasRefs.current[i];
+//               const ctx = canvas?.getContext("2d");
+//               if (!ctx) return;
+//               ctx.drawImage(e.target, 0, 0);
+//             }}
+//           />
+
+//           {rects
+//             .filter((r) => r.page === i)
+//             .map((r) => (
+//               <RedactionBox
+//                 key={r.id}
+//                 rect={r}
+//                 selected={activeRect === r.id}
+//                 onSelect={() => setActiveRect(r.id)}
+//                 onChange={(id, up) =>
+//                   up
+//                     ? setRects((prev) =>
+//                         prev.map((x) => (x.id === id ? up : x))
+//                       )
+//                     : setRects((prev) => prev.filter((x) => x.id !== id))
+//                 }
+//               />
+//             ))}
+//         </div>
+//       ))}
+//     </div>
+//   );
+// });
+
+// export default RedactPdfPreview;

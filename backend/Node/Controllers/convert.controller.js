@@ -605,43 +605,88 @@ exports.convertFromPdf = async (req, res) => {
   console.log("INPUT FILE:", file.originalname);
 
   try {
-    /* -------- PDF → JPG -------- */
+    /* -------- PDF → JPG (BULLETPROOF) -------- */
+    // if (type === "jpg") {
+    //   console.log("➡️ Calling PDF → JPG service...");
+    //   const result = await pdfToJpg(file.path);
+
+    //   if (result.mode === "multiple") {
+    //     console.log("📦 ZIP PATH:", result.zip);
+    //     console.log("📦 FILENAME:", result.zipFileName);
+        
+    //     // ✅ Verify file exists + get stats
+    //     if (!fs.existsSync(result.zip)) {
+    //       console.error("❌ ZIP FILE MISSING:", result.zip);
+    //       return res.status(500).json({ error: "ZIP file missing" });
+    //     }
+        
+    //     const stats = fs.statSync(result.zip);
+    //     console.log("📦 SIZE:", stats.size, "bytes");
+
+    //     // ✅ PERFECT HEADERS + sendFile (MOST RELIABLE)
+    //     res.set({
+    //       'Content-Type': 'application/zip',
+    //       'Content-Disposition': `attachment; filename="${result.zipFileName}"`,
+    //       'Content-Length': stats.size.toString()
+    //     });
+
+    //     res.sendFile(path.resolve(result.zip), (err) => {
+    //       if (err) {
+    //         console.error("❌ SendFile error:", err);
+    //         if (!res.headersSent) {
+    //           res.status(500).json({ error: "Download failed" });
+    //         }
+    //         return;
+    //       }
+          
+    //       console.log("✅ ZIP DOWNLOAD SENT SUCCESSFULLY");
+
+    //       // ✅ 5s DELAYED CLEANUP - BROWSER GETS FILE FIRST
+    //       setTimeout(() => {
+    //         try {
+    //           if (fs.existsSync(file.path)) {
+    //             fs.unlinkSync(file.path);
+    //             console.log("🗑️ Deleted input PDF");
+    //           }
+    //           if (fs.existsSync(result.zip)) {
+    //             fs.unlinkSync(result.zip);
+    //             console.log("🗑️ Deleted ZIP:", result.zipFileName);
+    //           }
+    //         } catch (e) {
+    //           console.warn("⚠️ Cleanup error:", e.message);
+    //         }
+    //       }, 5000);
+    //     });
+    //     return; // ✅ CRITICAL: EXIT EARLY
+    //   }
+    // }
+    // TOP OF FILE - ADD THIS
+    const http = require('http');
+
+    // INSIDE JPG SECTION
     if (type === "jpg") {
-      console.log("➡️ Calling PDF → JPG service...");
       const result = await pdfToJpg(file.path);
-
-      if (result.mode === "multiple") {
-        res.setHeader("Content-Type", "application/zip");
-        res.setHeader(
-          "Content-Disposition",
-          `attachment; filename="${result.zipFileName}"`
-        );
-
-        const zipStream = fs.createReadStream(result.zip);
-        zipStream.pipe(res);
-
-        zipStream.on("end", () => {
-          try {
-            deleteFile(file.path);
-            deleteFile(result.zip);
-            console.log("🧹 Cleanup done (ZIP + input)");
-          } catch (e) {
-            console.warn("⚠️ Cleanup warning:", e.message);
-          }
-        });
-
-        zipStream.on("error", (err) => {
-          console.error("❌ ZIP stream error:", err);
-          try {
-            deleteFile(file.path);
-            deleteFile(result.zip);
-          } catch {}
-          if (!res.headersSent) {
-            res.status(500).json({ error: "Error streaming ZIP file" });
-          }
-        });
-      }
+      
+      const zipData = fs.readFileSync(result.zip);
+      
+      const responseHeaders = {
+        'Content-Type': 'application/zip',
+        'Content-Disposition': `attachment; filename="${result.zipFileName}"`,
+        'Content-Length': Buffer.byteLength(zipData).toString()
+      };
+      
+      res.writeHead(200, responseHeaders);
+      res.end(zipData);
+      
+      // Cleanup
+      setTimeout(() => {
+        fs.unlinkSync(file.path);
+        fs.unlinkSync(result.zip);
+      }, 1000);
+      
+      return;
     }
+
 
     /* -------- PDF → WORD -------- */
     else if (type === "word") {

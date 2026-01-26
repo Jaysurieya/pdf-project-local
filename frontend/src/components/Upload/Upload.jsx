@@ -1,319 +1,347 @@
-import { useParams } from "react-router-dom";
-import { useState, useEffect,useRef } from "react";
-import { TOOLS } from "../../lib/tools";
-import SignatureCanvasBox from "./SignaturePad";
-import PdfPreview from "./PdfPreview";
-import OcrPdf from "./OcrPdf";
-import RedactPdfPreview from "./RedactPreview";
+  import { useParams } from "react-router-dom";
+  import { useState, useEffect,useRef } from "react";
+  import { TOOLS } from "../../lib/tools";
+  import SignatureCanvasBox from "./SignaturePad";
+  import PdfPreview from "./PdfPreview";
+  import OcrPdf from "./OcrPdf";
+  import RedactPdfPreview from "./RedactPreview";
 
-function Upload() {
-  const { tool } = useParams();
-  const config = TOOLS[tool];
+  function Upload() {
+    const { tool } = useParams();
+    const config = TOOLS[tool];
 
-  if (!config) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-white dark:bg-[#0B1220] text-slate-900 dark:text-white">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-red-500 mb-4">Tool Not Found</h1>
-          <p>The requested tool does not exist.</p>
+    if (!config) {
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-white dark:bg-[#0B1220] text-slate-900 dark:text-white">
+          <div className="text-center">
+            <h1 className="text-2xl font-bold text-red-500 mb-4">Tool Not Found</h1>
+            <p>The requested tool does not exist.</p>
+          </div>
         </div>
-      </div>
+      );
+    }
+
+    /* -------------------- STATES -------------------- */
+    const [files, setFiles] = useState([]);
+    const [loading, setLoading] = useState(false);
+
+    const redactRef = useRef(null);
+    const [redactDone, setRedactDone] = useState(false);
+
+
+    // Password for protect/unlock
+    const [password, setPassword] = useState("");
+
+    // Sign PDF
+    const [signatureData, setSignatureData] = useState(null);
+    const [selectedPage, setSelectedPage] = useState(0);
+    const [placements, setPlacements] = useState([]);
+
+    const [pagesInput, setPagesInput] = useState("");
+    const [orderInput, setOrderInput] = useState("");
+
+    // Rotation
+    const [rotationAngle, setRotationAngle] = useState(90);
+
+    const [selectedOption, setSelectedOption] = useState(
+      config.options?.[0]?.value || ""
     );
-  }
 
-  /* -------------------- STATES -------------------- */
-  const [files, setFiles] = useState([]);
-  const [loading, setLoading] = useState(false);
+    // Watermark
+    const [watermarkText, setWatermarkText] = useState("");
+    const [fontSize, setFontSize] = useState(24);
+    const [opacity, setOpacity] = useState(0.5);
+    const [color, setColor] = useState("gray");
+    const [position, setPosition] = useState("center");
+    const [fontFamily, setFontFamily] = useState("Helvetica-Bold");
+    const [diagonal, setDiagonal] = useState(false);
+    const [repeat, setRepeat] = useState(false);
+    const [repeatCount, setRepeatCount] = useState(5);
 
-  const redactRef = useRef(null);
-  const [redactDone, setRedactDone] = useState(false);
+    // Crop
+    const [cropLeft, setCropLeft] = useState(0);
+    const [cropRight, setCropRight] = useState(0);
+    const [cropTop, setCropTop] = useState(0);
+    const [cropBottom, setCropBottom] = useState(0);
+
+    // ✅ NEW: crop mode
+    const [cropMode, setCropMode] = useState("all"); // "all" | "page"
+
+    // ✅ NEW: multi page crop configs (page-by-page)
+    const [perPageCrop, setPerPageCrop] = useState([]);
+    const [activeCropPage, setActiveCropPage] = useState(1); // UI selection (1-based)
 
 
-  // Password for protect/unlock
-  const [password, setPassword] = useState("");
+    // Edit
+    const [editType, setEditType] = useState("metadata");
+    const [searchText, setSearchText] = useState("");
+    const [replaceText, setReplaceText] = useState("");
+    const [textYPosition, setTextYPosition] = useState(100);
 
-  // Sign PDF
-  const [signatureData, setSignatureData] = useState(null);
-  const [selectedPage, setSelectedPage] = useState(0);
-  const [placements, setPlacements] = useState([]);
+    const [metadata, setMetadata] = useState({
+      title: "",
+      author: "",
+      subject: "",
+      keywords: "",
+      creator: "",
+      producer: "",
+    });
 
-  const [pagesInput, setPagesInput] = useState("");
-  const [orderInput, setOrderInput] = useState("");
+    /* -------------------- TOOL FLAGS -------------------- */
+    const needsPages = tool === "remove-pages" || tool === "split-pdf";
+    const needsOrder = tool === "organize-pdf";
+    const needsRotate = tool === "rotate-pdf";
+    const needsWatermark = tool === "add-watermark";
+    const needsCrop = tool === "crop-pdf";
+    const needsEdit = tool === "edit-pdf";
+    const hasOptions = config.hasOptions;
 
-  // Rotation
-  const [rotationAngle, setRotationAngle] = useState(90);
+    // Debug placements
+    useEffect(() => {
+      console.log("Current placements:", placements);
+    }, [placements]);
 
-  const [selectedOption, setSelectedOption] = useState(
-    config.options?.[0]?.value || ""
-  );
+    /* -------------------- FILE HANDLING -------------------- */
+    const handleFileChange = (e) => {
+      const selected = Array.from(e.target.files);
+      processFiles(selected);
+      e.target.value = "";
+    };
 
-  // Watermark
-  const [watermarkText, setWatermarkText] = useState("");
-  const [fontSize, setFontSize] = useState(24);
-  const [opacity, setOpacity] = useState(0.5);
-  const [color, setColor] = useState("gray");
-  const [position, setPosition] = useState("center");
-  const [fontFamily, setFontFamily] = useState("Helvetica-Bold");
-  const [diagonal, setDiagonal] = useState(false);
-  const [repeat, setRepeat] = useState(false);
-  const [repeatCount, setRepeatCount] = useState(5);
-
-  // Crop
-  const [cropLeft, setCropLeft] = useState(0);
-  const [cropRight, setCropRight] = useState(0);
-  const [cropTop, setCropTop] = useState(0);
-  const [cropBottom, setCropBottom] = useState(0);
-
-  // Edit
-  const [editType, setEditType] = useState("metadata");
-  const [searchText, setSearchText] = useState("");
-  const [replaceText, setReplaceText] = useState("");
-  const [textYPosition, setTextYPosition] = useState(100);
-
-  const [metadata, setMetadata] = useState({
-    title: "",
-    author: "",
-    subject: "",
-    keywords: "",
-    creator: "",
-    producer: "",
-  });
-
-  /* -------------------- TOOL FLAGS -------------------- */
-  const needsPages = tool === "remove-pages" || tool === "split-pdf";
-  const needsOrder = tool === "organize-pdf";
-  const needsRotate = tool === "rotate-pdf";
-  const needsWatermark = tool === "add-watermark";
-  const needsCrop = tool === "crop-pdf";
-  const needsEdit = tool === "edit-pdf";
-  const hasOptions = config.hasOptions;
-
-  // Debug placements
-  useEffect(() => {
-    console.log("Current placements:", placements);
-  }, [placements]);
-
-  /* -------------------- FILE HANDLING -------------------- */
-  const handleFileChange = (e) => {
-    const selected = Array.from(e.target.files);
-    processFiles(selected);
-    e.target.value = "";
-  };
-
-  const processFiles = (selectedFiles) => {
-    if (config.multiple) {
-      setFiles((prev) => {
-        const map = new Map(prev.map(f => [`${f.name}-${f.size}`, f]));
-        selectedFiles.forEach(f => map.set(`${f.name}-${f.size}`, f));
-        return Array.from(map.values());
-      });
-    } else {
-      setFiles(selectedFiles.slice(0, 1));
-    }
-
-    // Reset signature-related states when new file is uploaded
-    if (config.toolKey === "sign_pdf") {
-      setSelectedPage(0);
-      setPlacements([]);
-      setSignatureData(null);
-    }
-  };
-
-  // Drag and drop handlers
-  const handleDragOver = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-  };
-
-  const handleDrop = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    
-    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      const droppedFiles = Array.from(e.dataTransfer.files);
-      // Filter files based on accepted types
-      const filteredFiles = droppedFiles.filter(file => {
-        const fileType = file.type;
-        const fileName = file.name.toLowerCase();
-        const acceptedTypes = config.accept.split(',').map(type => type.trim());
-        
-        return acceptedTypes.some(acceptedType => {
-          if (acceptedType.startsWith('.')) {
-            // Check file extension
-            return fileName.endsWith(acceptedType.toLowerCase());
-          } else {
-            // Check MIME type
-            return fileType === acceptedType || fileType.startsWith(acceptedType.split('/')[0] + '/');
-          }
+    const processFiles = (selectedFiles) => {
+      if (config.multiple) {
+        setFiles((prev) => {
+          const map = new Map(prev.map(f => [`${f.name}-${f.size}`, f]));
+          selectedFiles.forEach(f => map.set(`${f.name}-${f.size}`, f));
+          return Array.from(map.values());
         });
-      });
-      
-      if (filteredFiles.length > 0) {
-        processFiles(filteredFiles);
-      }
-    }
-  };
-
-  const removeFile = (index) => {
-    setFiles(prev => prev.filter((_, i) => i !== index));
-  };
-
-  /* -------------------- SIGN PDF HANDLER -------------------- */
-  const handleSign = async () => {
-    // ✅ FILTER VALID PLACEMENTS
-    const validPlacements = placements.filter(
-      (p) =>
-        typeof p.page === "number" &&
-        typeof p.xPercent === "number" &&
-        typeof p.yPercent === "number" &&
-        !isNaN(p.xPercent) &&
-        !isNaN(p.yPercent)
-    );
-
-    console.log("PLACEMENTS SENT TO BACKEND:", validPlacements);
-
-    if (!files[0] || !signatureData || validPlacements.length === 0) {
-      alert("Please upload PDF and place the signature on at least one page");
-      return;
-    }
-
-    setLoading(true);
-
-    try {
-      const formData = new FormData();
-      formData.append("pdf", files[0]);
-      formData.append("signatureBase64", signatureData);
-      formData.append("placements", JSON.stringify(validPlacements));
-
-      const res = await fetch("http://localhost:5000/api/security/sign", {
-        method: "POST",
-        body: formData
-      });
-
-      if (!res.ok) throw new Error(await res.text() || "Signing failed");
-
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "signed.pdf";
-      a.click();
-
-      URL.revokeObjectURL(url);
-    } catch (err) {
-      console.error(err);
-      alert("Failed to sign PDF");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  /* -------------------- PROCESS -------------------- */
-  const handleProcess = async () => {
-    if (!files.length) return alert("Please add a file");
-
-    if (needsPages && !pagesInput.trim())
-      return alert("Please enter page numbers");
-
-    if (needsOrder && !orderInput.trim())
-      return alert("Please enter page order");
-
-    if (needsWatermark && !watermarkText.trim())
-      return alert("Please enter watermark text");
-
-    if (needsCrop && files.length > 1)
-      return alert("Crop supports only single-page PDFs");
-
-    // Special handling for OCR PDF - just set the file to trigger the OcrPdf component
-    if (config.toolKey === "ocr_pdf") {
-      // The OcrPdf component will handle the OCR processing
-      return;
-    }
-
-    setLoading(true);
-
-    const formData = new FormData();
-    formData.append("tool", config.toolKey);
-    
-    // For compression tool, use "file" field name to match backend expectation
-    if (config.toolKey === "compress_pdf") {
-      formData.append("file", files[0]);
-    } else {
-      files.forEach(f => formData.append("files", f));
-    }
-
-    if (needsPages) formData.append("pages", pagesInput);
-    if (needsOrder) formData.append("order", orderInput);
-    if (needsRotate) formData.append("rotation", rotationAngle);
-    if (hasOptions) formData.append("option", selectedOption);
-
-    if (needsWatermark) {
-      formData.append("watermarkText", watermarkText);
-      formData.append("fontSize", fontSize);
-      formData.append("opacity", opacity);
-      formData.append("color", color);
-      formData.append("position", position);
-      formData.append("fontFamily", fontFamily);
-      formData.append("diagonal", diagonal);
-      formData.append("repeat", repeat);
-      formData.append("repeatCount", repeatCount);
-    }
-
-    if (needsCrop) {
-      formData.append("cropLeft", cropLeft);
-      formData.append("cropRight", cropRight);
-      formData.append("cropTop", cropTop);
-      formData.append("cropBottom", cropBottom);
-    }
-
-    if (needsEdit) {
-      formData.append("editType", editType);
-      if (editType === "metadata") {
-        formData.append("metadata", JSON.stringify(metadata));
       } else {
-        formData.append("searchText", searchText);
-        formData.append("replaceText", replaceText);
-        formData.append("textY", textYPosition);
+        setFiles(selectedFiles.slice(0, 1));
       }
-    }
 
-    // Handle compression level for compress-pdf tool
-    if (config.toolKey === "compress_pdf") {
-      formData.append("level", selectedOption);
-    }
-
-    // Handle password for protect/unlock PDF
-    if (config.toolKey === "protect_pdf" || config.toolKey === "unlock_pdf") {
-      if (!password.trim()) {
-        alert("Please enter a password");
-        setLoading(false);
-        return;
+      // Reset signature-related states when new file is uploaded
+      if (config.toolKey === "sign_pdf") {
+        setSelectedPage(0);
+        setPlacements([]);
+        setSignatureData(null);
       }
-      formData.append("password", password);
-    }
+      if (config.toolKey === "redact_pdf") {
+        setRedactDone(false);
+        setTimeout(() => {
+          redactRef.current?.resetAll();
+        }, 0);
+      }
+      if (config.toolKey === "crop_pdf") {
+        setCropMode("all");
+        setPerPageCrop([]);
+        setActiveCropPage(1);
+      }
 
-    try {
-      const res = await fetch(
-        `http://localhost:5000${config.backendRoute}`,
-        { method: "POST", body: formData }
+    };
+
+    // Drag and drop handlers
+    const handleDragOver = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+    };
+
+    const handleDrop = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      
+      if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+        const droppedFiles = Array.from(e.dataTransfer.files);
+        // Filter files based on accepted types
+        const filteredFiles = droppedFiles.filter(file => {
+          const fileType = file.type;
+          const fileName = file.name.toLowerCase();
+          const acceptedTypes = config.accept.split(',').map(type => type.trim());
+          
+          return acceptedTypes.some(acceptedType => {
+            if (acceptedType.startsWith('.')) {
+              // Check file extension
+              return fileName.endsWith(acceptedType.toLowerCase());
+            } else {
+              // Check MIME type
+              return fileType === acceptedType || fileType.startsWith(acceptedType.split('/')[0] + '/');
+            }
+          });
+        });
+        
+        if (filteredFiles.length > 0) {
+          processFiles(filteredFiles);
+        }
+      }
+    };
+
+    const removeFile = (index) => {
+      setFiles(prev => prev.filter((_, i) => i !== index));
+    };
+
+    /* -------------------- SIGN PDF HANDLER -------------------- */
+    const handleSign = async () => {
+      // ✅ FILTER VALID PLACEMENTS
+      const validPlacements = placements.filter(
+        (p) =>
+          typeof p.page === "number" &&
+          typeof p.xPercent === "number" &&
+          typeof p.yPercent === "number" &&
+          !isNaN(p.xPercent) &&
+          !isNaN(p.yPercent)
       );
 
-      if (!res.ok) throw new Error("Processing failed");
+      console.log("PLACEMENTS SENT TO BACKEND:", validPlacements);
 
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = config.downloadName || "result.pdf";
-      a.click();
-      URL.revokeObjectURL(url);
-    } catch (err) {
-      alert(err.message);
-    }
+      if (!files[0] || !signatureData || validPlacements.length === 0) {
+        alert("Please upload PDF and place the signature on at least one page");
+        return;
+      }
 
-    setLoading(false);
-  };
+      setLoading(true);
+
+      try {
+        const formData = new FormData();
+        formData.append("pdf", files[0]);
+        formData.append("signatureBase64", signatureData);
+        formData.append("placements", JSON.stringify(validPlacements));
+
+        const res = await fetch("http://localhost:5000/api/security/sign", {
+          method: "POST",
+          body: formData
+        });
+
+        if (!res.ok) throw new Error(await res.text() || "Signing failed");
+
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "signed.pdf";
+        a.click();
+
+        URL.revokeObjectURL(url);
+      } catch (err) {
+        console.error(err);
+        alert("Failed to sign PDF");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    /* -------------------- PROCESS -------------------- */
+    const handleProcess = async () => {
+      if (!files.length) return alert("Please add a file");
+
+      if (needsPages && !pagesInput.trim())
+        return alert("Please enter page numbers");
+
+      if (needsOrder && !orderInput.trim())
+        return alert("Please enter page order");
+
+      if (needsWatermark && !watermarkText.trim())
+        return alert("Please enter watermark text");
+
+      // Special handling for OCR PDF - just set the file to trigger the OcrPdf component
+      if (config.toolKey === "ocr_pdf") {
+        // The OcrPdf component will handle the OCR processing
+        return;
+      }
+
+      setLoading(true);
+
+      const formData = new FormData();
+      formData.append("tool", config.toolKey);
+      
+      // For compression tool, use "file" field name to match backend expectation
+      if (config.toolKey === "compress_pdf") {
+        formData.append("file", files[0]);
+      } else {
+        files.forEach(f => formData.append("files", f));
+      }
+
+      if (needsPages) formData.append("pages", pagesInput);
+      if (needsOrder) formData.append("order", orderInput);
+      if (needsRotate) formData.append("rotation", rotationAngle);
+      if (hasOptions) formData.append("option", selectedOption);
+
+      if (needsWatermark) {
+        formData.append("watermarkText", watermarkText);
+        formData.append("fontSize", fontSize);
+        formData.append("opacity", opacity);
+        formData.append("color", color);
+        formData.append("position", position);
+        formData.append("fontFamily", fontFamily);
+        formData.append("diagonal", diagonal);
+        formData.append("repeat", repeat);
+        formData.append("repeatCount", repeatCount);
+      }
+
+      if (needsCrop) {
+        formData.append("cropMode", cropMode);
+
+        // ✅ MODE A: same crop all pages
+        if (cropMode === "all") {
+          formData.append("cropLeft", cropLeft);
+          formData.append("cropRight", cropRight);
+          formData.append("cropTop", cropTop);
+          formData.append("cropBottom", cropBottom);
+        }
+
+        // ✅ MODE B: crop page-by-page
+        if (cropMode === "page") {
+          formData.append("perPageCrop", JSON.stringify(perPageCrop));
+        }
+      }
+
+
+      if (needsEdit) {
+        formData.append("editType", editType);
+        if (editType === "metadata") {
+          formData.append("metadata", JSON.stringify(metadata));
+        } else {
+          formData.append("searchText", searchText);
+          formData.append("replaceText", replaceText);
+          formData.append("textY", textYPosition);
+        }
+      }
+
+      // Handle compression level for compress-pdf tool
+      if (config.toolKey === "compress_pdf") {
+        formData.append("level", selectedOption);
+      }
+
+      // Handle password for protect/unlock PDF
+      if (config.toolKey === "protect_pdf" || config.toolKey === "unlock_pdf") {
+        if (!password.trim()) {
+          alert("Please enter a password");
+          setLoading(false);
+          return;
+        }
+        formData.append("password", password);
+      }
+
+      try {
+        const res = await fetch(
+          `http://localhost:5000${config.backendRoute}`,
+          { method: "POST", body: formData }
+        );
+
+        if (!res.ok) throw new Error("Processing failed");
+
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = tool === "pdf-to-jpg" ? `images_${Date.now()}.zip` : (config.downloadName || "result.pdf");
+        a.click();
+        URL.revokeObjectURL(url);
+      } catch (err) {
+        alert(err.message);
+      }
+
+      setLoading(false);
+    };
 
   /* -------------------- UI -------------------- */
   return (
@@ -457,6 +485,16 @@ function Upload() {
                     </svg>
                   </div>
                 </div>
+                {/* Helper text for compression options */}
+                {config.toolKey === "compress_pdf" && (
+                  <div className="mt-2 text-xs text-gray-500 dark:text-gray-400 space-y-1">
+                    {config.options.find(opt => opt.value === selectedOption)?.description && (
+                      <div className="mt-1 text-xs italic">
+                        {config.options.find(opt => opt.value === selectedOption)?.description}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
 
@@ -697,7 +735,7 @@ function Upload() {
               </div>
             )}
 
-            {needsCrop && (
+            {/* {needsCrop && (
               <div className="mb-6">
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-4">Crop Settings (%):</label>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -779,7 +817,259 @@ function Upload() {
                   </div>
                 </div>
               </div>
+            )} */}
+            {needsCrop && (
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-4">
+                  Crop Settings (%):
+                </label>
+
+                {/* ✅ Crop Mode */}
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Crop Mode:
+                  </label>
+                  <div className="flex gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setCropMode("all")}
+                      className={`px-4 py-2 rounded-xl font-semibold transition-all ${
+                        cropMode === "all"
+                          ? "bg-blue-600 text-white"
+                          : "bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200"
+                      }`}
+                    >
+                      Apply to ALL Pages
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setCropMode("page")}
+                      className={`px-4 py-2 rounded-xl font-semibold transition-all ${
+                        cropMode === "page"
+                          ? "bg-blue-600 text-white"
+                          : "bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200"
+                      }`}
+                    >
+                      Crop Page-by-Page
+                    </button>
+                  </div>
+                </div>
+
+                {/* ✅ MODE A: SAME crop for all pages */}
+                {cropMode === "all" && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Left */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Crop Left (%):
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        value={cropLeft}
+                        onChange={(e) => setCropLeft(Number(e.target.value))}
+                        className="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700"
+                      />
+                    </div>
+
+                    {/* Right */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Crop Right (%):
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        value={cropRight}
+                        onChange={(e) => setCropRight(Number(e.target.value))}
+                        className="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700"
+                      />
+                    </div>
+
+                    {/* Top */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Crop Top (%):
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        value={cropTop}
+                        onChange={(e) => setCropTop(Number(e.target.value))}
+                        className="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700"
+                      />
+                    </div>
+
+                    {/* Bottom */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Crop Bottom (%):
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        value={cropBottom}
+                        onChange={(e) => setCropBottom(Number(e.target.value))}
+                        className="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* ✅ MODE B: Crop page-by-page */}
+                {cropMode === "page" && (
+                  <div className="space-y-4">
+                    {/* Page selector */}
+                    <div className="flex items-center gap-3">
+                      <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                        Select Page:
+                      </label>
+                      <input
+                        type="number"
+                        min={1}
+                        value={activeCropPage}
+                        onChange={(e) => setActiveCropPage(Number(e.target.value))}
+                        className="w-24 px-3 py-2 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700"
+                      />
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const existing = perPageCrop.find((p) => p.page === activeCropPage);
+                          if (!existing) {
+                            setPerPageCrop((prev) => [
+                              ...prev,
+                              { page: activeCropPage, left: 0, right: 0, top: 0, bottom: 0 },
+                            ]);
+                          }
+                        }}
+                        className="px-4 py-2 rounded-xl bg-green-600 text-white font-semibold hover:bg-green-700"
+                      >
+                        Add Page Config
+                      </button>
+                    </div>
+
+                    {/* Current page crop editor */}
+                    {perPageCrop.some((p) => p.page === activeCropPage) ? (
+                      <>
+                        {(() => {
+                          const current = perPageCrop.find((p) => p.page === activeCropPage);
+
+                          const updateCurrent = (key, value) => {
+                            setPerPageCrop((prev) =>
+                              prev.map((p) =>
+                                p.page === activeCropPage ? { ...p, [key]: value } : p
+                              )
+                            );
+                          };
+
+                          return (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                  Crop Left (%):
+                                </label>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  max="100"
+                                  value={current.left}
+                                  onChange={(e) => updateCurrent("left", Number(e.target.value))}
+                                  className="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700"
+                                />
+                              </div>
+
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                  Crop Right (%):
+                                </label>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  max="100"
+                                  value={current.right}
+                                  onChange={(e) => updateCurrent("right", Number(e.target.value))}
+                                  className="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700"
+                                />
+                              </div>
+
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                  Crop Top (%):
+                                </label>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  max="100"
+                                  value={current.top}
+                                  onChange={(e) => updateCurrent("top", Number(e.target.value))}
+                                  className="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700"
+                                />
+                              </div>
+
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                  Crop Bottom (%):
+                                </label>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  max="100"
+                                  value={current.bottom}
+                                  onChange={(e) => updateCurrent("bottom", Number(e.target.value))}
+                                  className="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700"
+                                />
+                              </div>
+
+                              <div className="md:col-span-2 flex gap-3">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setPerPageCrop((prev) =>
+                                      prev.filter((p) => p.page !== activeCropPage)
+                                    );
+                                  }}
+                                  className="px-4 py-2 rounded-xl bg-red-600 text-white font-semibold hover:bg-red-700"
+                                >
+                                  Remove This Page Config
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })()}
+                      </>
+                    ) : (
+                      <div className="text-sm text-gray-500 dark:text-gray-400 italic">
+                        No crop config added for page {activeCropPage}. Click{" "}
+                        <b>Add Page Config</b>.
+                      </div>
+                    )}
+
+                    {/* Show summary */}
+                    {perPageCrop.length > 0 && (
+                      <div className="mt-4 p-4 rounded-xl bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600">
+                        <div className="text-sm font-semibold mb-2">Configured Pages:</div>
+                        <div className="text-xs text-gray-600 dark:text-gray-300 space-y-1">
+                          {perPageCrop
+                            .sort((a, b) => a.page - b.page)
+                            .map((p) => (
+                              <div key={p.page}>
+                                Page {p.page} → L:{p.left}% R:{p.right}% T:{p.top}% B:{p.bottom}%
+                              </div>
+                            ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             )}
+
 
             {needsEdit && (
               <div className="mb-6">
@@ -960,7 +1250,7 @@ function Upload() {
               </div>
             )}
 
-            {config.toolKey === "redact_pdf" ? (
+            {/* {config.toolKey === "redact_pdf" ? (
               <button
                 onClick={() => {
                   if (!redactDone) {
@@ -978,7 +1268,38 @@ function Upload() {
               >
                 {!redactDone ? "Apply Redact" : "Download"}
               </button>
-            ) : (
+            ) : (*/}
+            {config.toolKey === "redact_pdf" ? (
+                  <div className="flex flex-col gap-3 mt-6">
+                    <button
+                      onClick={() => {
+                        redactRef.current?.applyRedaction();
+                        setRedactDone(true);
+                      }}
+                      className={`w-full py-4 px-6 font-bold rounded-xl transition-all duration-300 flex items-center justify-center ${
+                        loading
+                          ? "bg-gray-400 cursor-not-allowed"
+                          : "bg-gradient-to-r from-red-600 to-red-800 hover:from-red-700 hover:to-red-900 transform hover:-translate-y-0.5 shadow-lg hover:shadow-xl"
+                      } text-white`}
+                    >
+                      Apply Redaction
+                    </button>
+
+                    <button
+                      onClick={() => redactRef.current?.resetRedactions()}
+                      className="w-full py-4 px-6 font-bold rounded-xl bg-gray-700 hover:bg-gray-800 text-white transition-all"
+                    >
+                      Reset Redactions
+                    </button>
+
+                    <button
+                      onClick={() => redactRef.current?.downloadRedactedPdf()}
+                      className="w-full py-4 px-6 font-bold rounded-xl bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white transition-all"
+                    >
+                      Download Redacted PDF
+                    </button>
+                  </div>
+                ) : (
               <button
                 onClick={config.toolKey === "sign_pdf" ? handleSign : handleProcess}
                 disabled={loading}
@@ -1004,7 +1325,8 @@ function Upload() {
                   </>
                 )}
               </button>
-            )}
+            )} 
+            
 
           </div>
         </div>
@@ -1026,794 +1348,3 @@ function Upload() {
 
 export default Upload;
 
-
-
-// import { useParams } from "react-router-dom";
-// import { useState, useEffect, useRef } from "react";
-// import { TOOLS } from "../../lib/tools";
-// import SignatureCanvasBox from "./SignaturePad";
-// import PdfPreview from "./PdfPreview";
-// import OcrPdf from "./OcrPdf";
-// import RedactPdfPreview from "./RedactPreview";
-
-// function Upload() {
-//   const { tool } = useParams();
-//   const config = TOOLS[tool];
-
-//   if (!config) {
-//     return (
-//       <div className="min-h-screen flex items-center justify-center bg-gray-50">
-//         <div className="text-center">
-//           <h1 className="text-2xl font-semibold text-red-600 mb-2">Tool Not Found</h1>
-//           <p className="text-gray-600">The requested tool does not exist.</p>
-//         </div>
-//       </div>
-//     );
-//   }
-
-//   const [files, setFiles] = useState([]);
-//   const [loading, setLoading] = useState(false);
-//   const redactRef = useRef(null);
-//   const [redactDone, setRedactDone] = useState(false);
-//   const [password, setPassword] = useState("");
-//   const [signatureData, setSignatureData] = useState(null);
-//   const [selectedPage, setSelectedPage] = useState(0);
-//   const [placements, setPlacements] = useState([]);
-//   const [pagesInput, setPagesInput] = useState("");
-//   const [orderInput, setOrderInput] = useState("");
-//   const [rotationAngle, setRotationAngle] = useState(90);
-//   const [selectedOption, setSelectedOption] = useState(config.options?.[0]?.value || "");
-//   const [watermarkText, setWatermarkText] = useState("");
-//   const [fontSize, setFontSize] = useState(24);
-//   const [opacity, setOpacity] = useState(0.5);
-//   const [color, setColor] = useState("gray");
-//   const [position, setPosition] = useState("center");
-//   const [fontFamily, setFontFamily] = useState("Helvetica-Bold");
-//   const [diagonal, setDiagonal] = useState(false);
-//   const [repeat, setRepeat] = useState(false);
-//   const [repeatCount, setRepeatCount] = useState(5);
-//   const [cropLeft, setCropLeft] = useState(0);
-//   const [cropRight, setCropRight] = useState(0);
-//   const [cropTop, setCropTop] = useState(0);
-//   const [cropBottom, setCropBottom] = useState(0);
-//   const [editType, setEditType] = useState("metadata");
-//   const [searchText, setSearchText] = useState("");
-//   const [replaceText, setReplaceText] = useState("");
-//   const [textYPosition, setTextYPosition] = useState(100);
-//   const [metadata, setMetadata] = useState({
-//     title: "",
-//     author: "",
-//     subject: "",
-//     keywords: "",
-//     creator: "",
-//     producer: "",
-//   });
-
-//   const needsPages = tool === "remove-pages" || tool === "split-pdf";
-//   const needsOrder = tool === "organize-pdf";
-//   const needsRotate = tool === "rotate-pdf";
-//   const needsWatermark = tool === "add-watermark";
-//   const needsCrop = tool === "crop-pdf";
-//   const needsEdit = tool === "edit-pdf";
-//   const hasOptions = config.hasOptions;
-
-//   useEffect(() => {
-//     console.log("Current placements:", placements);
-//   }, [placements]);
-
-//   const handleFileChange = (e) => {
-//     const selected = Array.from(e.target.files);
-//     processFiles(selected);
-//     e.target.value = "";
-//   };
-
-//   const processFiles = (selectedFiles) => {
-//     if (config.multiple) {
-//       setFiles((prev) => {
-//         const map = new Map(prev.map(f => [`${f.name}-${f.size}`, f]));
-//         selectedFiles.forEach(f => map.set(`${f.name}-${f.size}`, f));
-//         return Array.from(map.values());
-//       });
-//     } else {
-//       setFiles(selectedFiles.slice(0, 1));
-//     }
-
-//     if (config.toolKey === "sign_pdf") {
-//       setSelectedPage(0);
-//       setPlacements([]);
-//       setSignatureData(null);
-//     }
-//   };
-
-//   const handleDragOver = (e) => {
-//     e.preventDefault();
-//     e.stopPropagation();
-//   };
-
-//   const handleDrop = (e) => {
-//     e.preventDefault();
-//     e.stopPropagation();
-    
-//     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-//       const droppedFiles = Array.from(e.dataTransfer.files);
-//       const filteredFiles = droppedFiles.filter(file => {
-//         const fileType = file.type;
-//         const fileName = file.name.toLowerCase();
-//         const acceptedTypes = config.accept.split(',').map(type => type.trim());
-        
-//         return acceptedTypes.some(acceptedType => {
-//           if (acceptedType.startsWith('.')) {
-//             return fileName.endsWith(acceptedType.toLowerCase());
-//           } else {
-//             return fileType === acceptedType || fileType.startsWith(acceptedType.split('/')[0] + '/');
-//           }
-//         });
-//       });
-      
-//       if (filteredFiles.length > 0) {
-//         processFiles(filteredFiles);
-//       }
-//     }
-//   };
-
-//   const removeFile = (index) => {
-//     setFiles(prev => prev.filter((_, i) => i !== index));
-//   };
-
-//   const handleSign = async () => {
-//     const validPlacements = placements.filter(
-//       (p) =>
-//         typeof p.page === "number" &&
-//         typeof p.xPercent === "number" &&
-//         typeof p.yPercent === "number" &&
-//         !isNaN(p.xPercent) &&
-//         !isNaN(p.yPercent)
-//     );
-
-//     console.log("PLACEMENTS SENT TO BACKEND:", validPlacements);
-
-//     if (!files[0] || !signatureData || validPlacements.length === 0) {
-//       alert("Please upload PDF and place the signature on at least one page");
-//       return;
-//     }
-
-//     setLoading(true);
-
-//     try {
-//       const formData = new FormData();
-//       formData.append("pdf", files[0]);
-//       formData.append("signatureBase64", signatureData);
-//       formData.append("placements", JSON.stringify(validPlacements));
-
-//       const res = await fetch("http://localhost:5000/api/security/sign", {
-//         method: "POST",
-//         body: formData
-//       });
-
-//       if (!res.ok) throw new Error(await res.text() || "Signing failed");
-
-//       const blob = await res.blob();
-//       const url = URL.createObjectURL(blob);
-
-//       const a = document.createElement("a");
-//       a.href = url;
-//       a.download = "signed.pdf";
-//       a.click();
-
-//       URL.revokeObjectURL(url);
-//     } catch (err) {
-//       console.error(err);
-//       alert("Failed to sign PDF");
-//     } finally {
-//       setLoading(false);
-//     }
-//   };
-
-//   const handleProcess = async () => {
-//     if (!files.length) return alert("Please add a file");
-
-//     if (needsPages && !pagesInput.trim())
-//       return alert("Please enter page numbers");
-
-//     if (needsOrder && !orderInput.trim())
-//       return alert("Please enter page order");
-
-//     if (needsWatermark && !watermarkText.trim())
-//       return alert("Please enter watermark text");
-
-//     if (needsCrop && files.length > 1)
-//       return alert("Crop supports only single-page PDFs");
-
-//     if (config.toolKey === "ocr_pdf") {
-//       return;
-//     }
-
-//     setLoading(true);
-
-//     const formData = new FormData();
-//     formData.append("tool", config.toolKey);
-    
-//     if (config.toolKey === "compress_pdf") {
-//       formData.append("file", files[0]);
-//     } else {
-//       files.forEach(f => formData.append("files", f));
-//     }
-
-//     if (needsPages) formData.append("pages", pagesInput);
-//     if (needsOrder) formData.append("order", orderInput);
-//     if (needsRotate) formData.append("rotation", rotationAngle);
-//     if (hasOptions) formData.append("option", selectedOption);
-
-//     if (needsWatermark) {
-//       formData.append("watermarkText", watermarkText);
-//       formData.append("fontSize", fontSize);
-//       formData.append("opacity", opacity);
-//       formData.append("color", color);
-//       formData.append("position", position);
-//       formData.append("fontFamily", fontFamily);
-//       formData.append("diagonal", diagonal);
-//       formData.append("repeat", repeat);
-//       formData.append("repeatCount", repeatCount);
-//     }
-
-//     if (needsCrop) {
-//       formData.append("cropLeft", cropLeft);
-//       formData.append("cropRight", cropRight);
-//       formData.append("cropTop", cropTop);
-//       formData.append("cropBottom", cropBottom);
-//     }
-
-//     if (needsEdit) {
-//       formData.append("editType", editType);
-//       if (editType === "metadata") {
-//         formData.append("metadata", JSON.stringify(metadata));
-//       } else {
-//         formData.append("searchText", searchText);
-//         formData.append("replaceText", replaceText);
-//         formData.append("textY", textYPosition);
-//       }
-//     }
-
-//     if (config.toolKey === "compress_pdf") {
-//       formData.append("level", selectedOption);
-//     }
-
-//     if (config.toolKey === "protect_pdf" || config.toolKey === "unlock_pdf") {
-//       if (!password.trim()) {
-//         alert("Please enter a password");
-//         setLoading(false);
-//         return;
-//       }
-//       formData.append("password", password);
-//     }
-
-//     try {
-//       const res = await fetch(
-//         `http://localhost:5000${config.backendRoute}`,
-//         { method: "POST", body: formData }
-//       );
-
-//       if (!res.ok) throw new Error("Processing failed");
-
-//       const blob = await res.blob();
-//       const url = URL.createObjectURL(blob);
-//       const a = document.createElement("a");
-//       a.href = url;
-//       a.download = config.downloadName || "result.pdf";
-//       a.click();
-//       URL.revokeObjectURL(url);
-//     } catch (err) {
-//       alert(err.message);
-//     }
-
-//     setLoading(false);
-//   };
-
-//   return (
-//     <div className="min-h-screen bg-gray-50 py-8 px-4 sm:px-6 lg:px-8">
-//       {config.toolKey === "ocr_pdf" && files.length > 0 ? (
-//         <OcrPdf file={files[0]} onBack={() => setFiles([])} />
-//       ) : (
-//         <div className="max-w-3xl mx-auto">
-//           <div className="text-center mb-10">
-//             <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-3">{config.title}</h1>
-//             <div className="w-20 h-1 bg-blue-600 mx-auto rounded-full"></div>
-//           </div>
-
-//           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 sm:p-8">
-//             <div className="mb-8">
-//               <label className="block text-sm font-semibold text-gray-700 mb-3">
-//                 Select PDF File{config.multiple ? '(s)' : ''}
-//               </label>
-//               <div className="relative">
-//                 <input
-//                   type="file"
-//                   accept={config.accept}
-//                   multiple={config.multiple}
-//                   onChange={handleFileChange}
-//                   className="w-full hidden"
-//                   id="file-upload"
-//                 />
-//                 <label 
-//                   htmlFor="file-upload"
-//                   onDragOver={handleDragOver}
-//                   onDrop={handleDrop}
-//                   className="flex flex-col items-center justify-center w-full h-48 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100 hover:border-blue-400 transition-all duration-200"
-//                 >
-//                   <div className="flex flex-col items-center justify-center py-6">
-//                     <svg className="w-12 h-12 mb-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-//                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 0115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
-//                     </svg>
-//                     <p className="mb-2 text-base font-medium text-gray-700">
-//                       Click to upload or drag and drop
-//                     </p>
-//                     <p className="text-sm text-gray-500">
-//                       {config.accept.replace(/\./g, '').toUpperCase()} files only
-//                     </p>
-//                   </div>
-//                 </label>
-//               </div>
-//             </div>
-
-//             {config.toolKey === "protect_pdf" && (
-//               <div className="mb-8">
-//                 <label htmlFor="password" className="block text-sm font-semibold text-gray-700 mb-3">Password</label>
-//                 <input
-//                   type="password"
-//                   id="password"
-//                   value={password}
-//                   onChange={(e) => setPassword(e.target.value)}
-//                   className="w-full px-4 py-3 rounded-lg border border-gray-300 bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-//                   placeholder="Enter password to protect PDF"
-//                 />
-//               </div>
-//             )}
-
-//             {config.toolKey === "unlock_pdf" && (
-//               <div className="mb-8">
-//                 <label htmlFor="password" className="block text-sm font-semibold text-gray-700 mb-3">Password</label>
-//                 <input
-//                   type="password"
-//                   id="password"
-//                   value={password}
-//                   onChange={(e) => setPassword(e.target.value)}
-//                   className="w-full px-4 py-3 rounded-lg border border-gray-300 bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-//                   placeholder="Enter password to unlock PDF"
-//                 />
-//               </div>
-//             )}
-
-//             {config.toolKey === "sign_pdf" && (
-//               <>
-//                 <div className="mb-8">
-//                   <label className="block text-sm font-semibold text-gray-700 mb-3">Create Signature</label>
-//                   <SignatureCanvasBox onSave={setSignatureData} />
-//                 </div>
-
-//                 {files[0] && (
-//                   <div className="mb-8">
-//                     <label className="block text-sm font-semibold text-gray-700 mb-3">Preview & Place Signature</label>
-//                     <PdfPreview
-//                       file={files[0]}
-//                       selectedPage={selectedPage}
-//                       setSelectedPage={setSelectedPage}
-//                       signatureData={signatureData}
-//                       placements={placements}
-//                       onPlacement={(p) => {
-//                         setPlacements((prev) => {
-//                           const rest = prev.filter((x) => x.page !== p.page);
-//                           return [...rest, p];
-//                         });
-//                       }}
-//                     />
-//                   </div>
-//                 )}
-//               </>
-//             )}
-
-//             {hasOptions && (
-//               <div className="mb-8">
-//                 <label className="block text-sm font-semibold text-gray-700 mb-3">Select Option</label>
-//                 <select
-//                   value={selectedOption}
-//                   onChange={e => setSelectedOption(e.target.value)}
-//                   className="w-full px-4 py-3 rounded-lg border border-gray-300 bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all appearance-none"
-//                 >
-//                   {config.options.map(opt => (
-//                     <option key={opt.value} value={opt.value}>
-//                       {opt.label}
-//                     </option>
-//                   ))}
-//                 </select>
-//               </div>
-//             )}
-
-//             {needsPages && (
-//               <div className="mb-8">
-//                 <label className="block text-sm font-semibold text-gray-700 mb-3">Page Numbers</label>
-//                 <input
-//                   placeholder="1,3,5 or 1-4"
-//                   value={pagesInput}
-//                   onChange={e => setPagesInput(e.target.value)}
-//                   className="w-full px-4 py-3 rounded-lg border border-gray-300 bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-//                 />
-//               </div>
-//             )}
-
-//             {needsOrder && (
-//               <div className="mb-8">
-//                 <label className="block text-sm font-semibold text-gray-700 mb-3">Page Order</label>
-//                 <input
-//                   placeholder="3,1,4,2"
-//                   value={orderInput}
-//                   onChange={e => setOrderInput(e.target.value)}
-//                   className="w-full px-4 py-3 rounded-lg border border-gray-300 bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-//                 />
-//               </div>
-//             )}
-
-//             {needsRotate && (
-//               <div className="mb-8">
-//                 <label className="block text-sm font-semibold text-gray-700 mb-3">Rotation Angle</label>
-//                 <select
-//                   value={rotationAngle}
-//                   onChange={e => setRotationAngle(Number(e.target.value))}
-//                   className="w-full px-4 py-3 rounded-lg border border-gray-300 bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all appearance-none"
-//                 >
-//                   <option value={90}>90° Clockwise</option>
-//                   <option value={180}>180°</option>
-//                   <option value={270}>90° Counterclockwise</option>
-//                   <option value={0}>Reset Rotation</option>
-//                 </select>
-//               </div>
-//             )}
-
-//             {needsWatermark && (
-//               <div className="mb-8 p-6 bg-gray-50 rounded-lg border border-gray-200">
-//                 <label className="block text-sm font-semibold text-gray-700 mb-4">Watermark Settings</label>
-                
-//                 <div className="mb-4">
-//                   <input
-//                     placeholder="Watermark text"
-//                     value={watermarkText}
-//                     onChange={e => setWatermarkText(e.target.value)}
-//                     className="w-full px-4 py-3 rounded-lg border border-gray-300 bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-//                   />
-//                 </div>
-                
-//                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-//                   <div>
-//                     <label className="block text-xs font-medium text-gray-600 mb-2">Font Size</label>
-//                     <input
-//                       type="number"
-//                       min="1"
-//                       max="100"
-//                       value={fontSize}
-//                       onChange={e => setFontSize(Number(e.target.value))}
-//                       className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-//                     />
-//                   </div>
-//                   <div>
-//                     <label className="block text-xs font-medium text-gray-600 mb-2">Opacity</label>
-//                     <input
-//                       type="number"
-//                       min="0"
-//                       max="1"
-//                       step="0.1"
-//                       value={opacity}
-//                       onChange={e => setOpacity(Number(e.target.value))}
-//                       className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-//                     />
-//                   </div>
-//                 </div>
-                
-//                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-//                   <div>
-//                     <label className="block text-xs font-medium text-gray-600 mb-2">Color</label>
-//                     <select
-//                       value={color}
-//                       onChange={e => setColor(e.target.value)}
-//                       className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all appearance-none"
-//                     >
-//                       <option value="black">Black</option>
-//                       <option value="white">White</option>
-//                       <option value="gray">Gray</option>
-//                       <option value="red">Red</option>
-//                       <option value="blue">Blue</option>
-//                       <option value="green">Green</option>
-//                       <option value="yellow">Yellow</option>
-//                       <option value="purple">Purple</option>
-//                       <option value="orange">Orange</option>
-//                     </select>
-//                   </div>
-//                   <div>
-//                     <label className="block text-xs font-medium text-gray-600 mb-2">Position</label>
-//                     <select
-//                       value={position}
-//                       onChange={e => setPosition(e.target.value)}
-//                       className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all appearance-none"
-//                     >
-//                       <option value="center">Center</option>
-//                       <option value="top-left">Top Left</option>
-//                       <option value="top-right">Top Right</option>
-//                       <option value="bottom-left">Bottom Left</option>
-//                       <option value="bottom-right">Bottom Right</option>
-//                     </select>
-//                   </div>
-//                 </div>
-                
-//                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-//                   <div>
-//                     <label className="block text-xs font-medium text-gray-600 mb-2">Font Family</label>
-//                     <select
-//                       value={fontFamily}
-//                       onChange={e => setFontFamily(e.target.value)}
-//                       className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all appearance-none"
-//                     >
-//                       <option value="Helvetica">Helvetica</option>
-//                       <option value="Helvetica-Bold">Helvetica-Bold</option>
-//                       <option value="Times-Roman">Times-Roman</option>
-//                       <option value="Times-Bold">Times-Bold</option>
-//                       <option value="Courier">Courier</option>
-//                       <option value="Courier-Bold">Courier-Bold</option>
-//                     </select>
-//                   </div>
-//                   <div>
-//                     <label className="block text-xs font-medium text-gray-600 mb-2">Repeat Count</label>
-//                     <input
-//                       type="number"
-//                       min="1"
-//                       max="50"
-//                       value={repeatCount}
-//                       onChange={e => setRepeatCount(Number(e.target.value))}
-//                       className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-//                     />
-//                   </div>
-//                 </div>
-                
-//                 <div className="flex items-center gap-6">
-//                   <div className="flex items-center">
-//                     <input
-//                       type="checkbox"
-//                       id="diagonal"
-//                       checked={diagonal}
-//                       onChange={e => setDiagonal(e.target.checked)}
-//                       className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
-//                     />
-//                     <label htmlFor="diagonal" className="ml-2 text-sm font-medium text-gray-700">Diagonal</label>
-//                   </div>
-//                   <div className="flex items-center">
-//                     <input
-//                       type="checkbox"
-//                       id="repeat"
-//                       checked={repeat}
-//                       onChange={e => setRepeat(e.target.checked)}
-//                       className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
-//                     />
-//                     <label htmlFor="repeat" className="ml-2 text-sm font-medium text-gray-700">Repeat</label>
-//                   </div>
-//                 </div>
-//               </div>
-//             )}
-
-//             {needsCrop && (
-//               <div className="mb-8 p-6 bg-gray-50 rounded-lg border border-gray-200">
-//                 <label className="block text-sm font-semibold text-gray-700 mb-4">Crop Settings (%)</label>
-//                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-//                   <div>
-//                     <label className="block text-xs font-medium text-gray-600 mb-2">Crop Left (%)</label>
-//                     <input
-//                       type="number"
-//                       min="0"
-//                       max="100"
-//                       value={cropLeft}
-//                       onChange={e => setCropLeft(Number(e.target.value))}
-//                       className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-//                       placeholder="Left margin"
-//                     />
-//                   </div>
-//                   <div>
-//                     <label className="block text-xs font-medium text-gray-600 mb-2">Crop Right (%)</label>
-//                     <input
-//                       type="number"
-//                       min="0"
-//                       max="100"
-//                       value={cropRight}
-//                       onChange={e => setCropRight(Number(e.target.value))}
-//                       className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-//                       placeholder="Right margin"
-//                     />
-//                   </div>
-//                   <div>
-//                     <label className="block text-xs font-medium text-gray-600 mb-2">Crop Top (%)</label>
-//                     <input
-//                       type="number"
-//                       min="0"
-//                       max="100"
-//                       value={cropTop}
-//                       onChange={e => setCropTop(Number(e.target.value))}
-//                       className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-//                       placeholder="Top margin"
-//                     />
-//                   </div>
-//                   <div>
-//                     <label className="block text-xs font-medium text-gray-600 mb-2">Crop Bottom (%)</label>
-//                     <input
-//                       type="number"
-//                       min="0"
-//                       max="100"
-//                       value={cropBottom}
-//                       onChange={e => setCropBottom(Number(e.target.value))}
-//                       className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-//                       placeholder="Bottom margin"
-//                     />
-//                   </div>
-//                 </div>
-//               </div>
-//             )}
-
-//             {needsEdit && (
-//               <div className="mb-8 p-6 bg-gray-50 rounded-lg border border-gray-200">
-//                 <label className="block text-sm font-semibold text-gray-700 mb-4">Edit Type</label>
-//                 <div className="mb-4">
-//                   <select
-//                     value={editType}
-//                     onChange={e => setEditType(e.target.value)}
-//                     className="w-full px-4 py-3 rounded-lg border border-gray-300 bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all appearance-none"
-//                   >
-//                     <option value="metadata">Edit Metadata</option>
-//                     <option value="text-replace">Replace Text</option>
-//                   </select>
-//                 </div>
-                
-//                 {editType === "metadata" ? (
-//                   <div className="space-y-4">
-//                     <input
-//                       placeholder="Title"
-//                       value={metadata.title}
-//                       onChange={e => setMetadata({...metadata, title: e.target.value})}
-//                       className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-//                     />
-//                     <input
-//                       placeholder="Author"
-//                       value={metadata.author}
-//                       onChange={e => setMetadata({...metadata, author: e.target.value})}
-//                       className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-//                     />
-//                     <input
-//                       placeholder="Subject"
-//                       value={metadata.subject}
-//                       onChange={e => setMetadata({...metadata, subject: e.target.value})}
-//                       className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-//                       />
-//                 <input
-//                   placeholder="Keywords"
-//                   value={metadata.keywords}
-//                   onChange={e => setMetadata({...metadata, keywords: e.target.value})}
-//                   className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-//                 />
-//                 <input
-//                   placeholder="Creator"
-//                   value={metadata.creator}
-//                   onChange={e => setMetadata({...metadata, creator: e.target.value})}
-//                   className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-//                 />
-//                 <input
-//                   placeholder="Producer"
-//                   value={metadata.producer}
-//                   onChange={e => setMetadata({...metadata, producer: e.target.value})}
-//                   className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-//                 />
-//               </div>
-//             ) : (
-//               <div className="space-y-4">
-//                 <input
-//                   placeholder="Search Text"
-//                   value={searchText}
-//                   onChange={e => setSearchText(e.target.value)}
-//                   className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-//                 />
-//                 <input
-//                   placeholder="Replace Text"
-//                   value={replaceText}
-//                   onChange={e => setReplaceText(e.target.value)}
-//                   className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-//                 />
-//                 <div>
-//                   <label className="block text-xs font-medium text-gray-600 mb-2">Y Position</label>
-//                   <input
-//                     type="number"
-//                     value={textYPosition}
-//                     onChange={e => setTextYPosition(Number(e.target.value))}
-//                     className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-//                     placeholder="Y coordinate for new text"
-//                   />
-//                 </div>
-//               </div>
-//             )}
-//           </div>
-//         )}
-
-//         {files.length > 0 && (
-//           <div className="mb-8">
-//             <label className="block text-sm font-semibold text-gray-700 mb-3">Selected Files</label>
-//             <div className="space-y-2 max-h-48 overflow-y-auto">
-//               {files.map((f, i) => (
-//                 <div key={`${f.name}-${f.size}`} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg border border-gray-200 hover:border-gray-300 transition-colors">
-//                   <div className="flex items-center min-w-0 flex-1">
-//                     <svg className="w-5 h-5 mr-3 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-//                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-//                     </svg>
-//                     <span className="truncate text-sm text-gray-700">{f.name}</span>
-//                   </div>
-//                   <button 
-//                     onClick={() => removeFile(i)} 
-//                     className="ml-3 p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors flex-shrink-0"
-//                     aria-label="Remove file"
-//                   >
-//                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-//                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
-//                     </svg>
-//                   </button>
-//                 </div>
-//               ))}
-//             </div>
-//           </div>
-//         )}
-
-//         {config.toolKey === "redact_pdf" ? (
-//           <button
-//             onClick={() => {
-//               if (!redactDone) {
-//                 redactRef.current.applyRedaction();
-//                 setRedactDone(true);
-//               } else {
-//                 redactRef.current.downloadRedactedPdf();
-//               }
-//             }}
-//             className={`w-full py-3.5 px-6 text-base font-semibold rounded-lg transition-all duration-200 ${
-//               loading
-//                 ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-//                 : "bg-blue-600 text-white hover:bg-blue-700 shadow-sm hover:shadow-md"
-//             }`}
-//           >
-//             {!redactDone ? "Apply Redact" : "Download"}
-//           </button>
-//         ) : (
-//           <button
-//             onClick={config.toolKey === "sign_pdf" ? handleSign : handleProcess}
-//             disabled={loading}
-//             className={`w-full py-3.5 px-6 text-base font-semibold rounded-lg transition-all duration-200 flex items-center justify-center ${
-//               loading
-//                 ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-//                 : "bg-blue-600 text-white hover:bg-blue-700 shadow-sm hover:shadow-md"
-//             }`}
-//           >
-//             {loading ? (
-//               <>
-//                 <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" viewBox="0 0 24 24">
-//                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"></circle>
-//                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-//                 </svg>
-//                 Processing...
-//               </>
-//             ) : (
-//               "Process"
-//             )}
-//           </button>
-//         )}
-//       </div>
-//     </div>
-//   )}
-  
-//   {config.toolKey === "redact_pdf" && files[0] && (
-//     <div className="w-full mt-8">
-//       <div className="flex justify-center">
-//         <RedactPdfPreview ref={redactRef} file={files[0]} />
-//       </div>
-//     </div>
-//   )}
-// </div>
-// );
-// }
-// export default Upload;

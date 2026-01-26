@@ -256,11 +256,29 @@ module.exports = async (pdfPath) => {
       });
 
       zipfile.outputStream.pipe(output);
-      zipfile.end();
 
+      // ✅ FIXED: PROPER ZIP CREATION HANDLING WITH VALIDATION
       output.on("close", () => {
         console.log("✅ ZIP Ready:", zipPath);
-        console.log("📊 ZIP Size:", fs.statSync(zipPath).size, "bytes");
+        
+        // -------- VALIDATION: Double-check ZIP file --------
+        try {
+          if (!fs.existsSync(zipPath)) {
+            console.error("❌ ZIP file was not created properly:", zipPath);
+            return reject(new Error("Failed to create ZIP file"));
+          }
+
+          const stats = fs.statSync(zipPath);
+          console.log("📊 ZIP Size:", stats.size, "bytes");
+          
+          if (stats.size === 0) {
+            console.error("❌ ZIP file is empty:", zipPath);
+            return reject(new Error("ZIP file is empty"));
+          }
+        } catch (statErr) {
+          console.error("❌ ZIP validation failed:", statErr);
+          return reject(new Error("ZIP validation failed"));
+        }
 
         // -------- CLEANUP TEMP IMAGES --------
         try {
@@ -270,17 +288,21 @@ module.exports = async (pdfPath) => {
           console.warn("⚠️ Cleanup warning:", cleanupErr.message);
         }
 
+        // ✅ RESOLVE WITH CLEAN PATHS
         resolve({
           mode: "multiple",
           zip: zipPath,
-          zipFileName,
+          zipFileName: zipFileName,  // ✅ ENSURE .zip extension
           totalPages: jpgFiles.length,
         });
       });
 
       output.on("error", (err) => {
+        console.error("❌ ZIP write error:", err);
         reject(new Error("Failed to write ZIP file: " + err.message));
       });
+
+      zipfile.end();
     });
   });
 };
