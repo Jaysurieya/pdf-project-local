@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
 import { Send, Sparkles, X, Loader2, Bot, User, Trash2, ExternalLink, Copy, Check, Globe, Eye, AlertTriangle, ArrowRight, CornerDownLeft, Mic, Link as LinkIcon } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { config } from '../../lib/env';
 
 // Cast motion components
 const MotionDiv = motion.div as any;
@@ -119,11 +120,14 @@ const AIAssistant: React.FC = () => {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [suggestedPrompts, setSuggestedPrompts] = useState<string[]>(SECTION_PROMPTS['hero-section']);
   const [isListening, setIsListening] = useState(false);
+  const [lastRequestTime, setLastRequestTime] = useState<number>(0);
+  const [isInCooldown, setIsInCooldown] = useState(false);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const isLoadingRef = useRef(false);
   const recognitionRef = useRef<any>(null);
   const baseInputRef = useRef("");
+  const requestLockRef = useRef(false);
 
   // Initialize Speech Recognition
   useEffect(() => {
@@ -188,6 +192,13 @@ const AIAssistant: React.FC = () => {
     isLoadingRef.current = isLoading;
   }, [isLoading]);
 
+  // Cleanup request lock when component unmounts
+  useEffect(() => {
+    return () => {
+      requestLockRef.current = false;
+    };
+  }, []);
+
   // Dynamic Loading Message Cycle
   useEffect(() => {
     if (!isLoading) return;
@@ -225,6 +236,64 @@ const AIAssistant: React.FC = () => {
     return () => observer.disconnect();
   }, []);
 
+  // Helper function to detect rate limit errors
+  const isRateLimitError = (error: any): boolean => {
+    const message = error?.message?.toLowerCase() || '';
+    const status = error?.status || error?.response?.status;
+    
+    return (
+      status === 429 ||
+      message.includes('429') ||
+      message.includes('rate limit') ||
+      message.includes('too many requests') ||
+      message.includes('quota exceeded') ||
+      message.includes('usage limit')
+    );
+  };
+
+  // Helper function for sleep/delay
+  const sleep = (ms: number): Promise<void> => {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  };
+
+  // Retry function with exponential backoff for 429 errors
+  const retryGenerateStream = async (
+    generateFn: () => Promise<any>,
+    maxRetries: number = 3,
+    baseDelay: number = 1000
+  ): Promise<any> => {
+    let lastError: any;
+    
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        return await generateFn();
+      } catch (error) {
+        lastError = error;
+        
+        // Only retry on rate limit errors
+        if (!isRateLimitError(error) || attempt === maxRetries) {
+          throw error;
+        }
+        
+        // Calculate exponential backoff delay
+        const delay = baseDelay * Math.pow(2, attempt);
+        console.log(`Rate limit hit. Retrying in ${delay}ms... (attempt ${attempt + 1}/${maxRetries + 1})`);
+        
+        // Add user-friendly message
+        setMessages(prev => [...prev, {
+          id: `retry-${Date.now()}`,
+          role: 'model',
+          text: `⏳ Too many requests, retrying in ${Math.round(delay / 1000)} seconds...`,
+          isError: true
+        }]);
+        
+        await sleep(delay);
+      }
+    }
+    
+    throw lastError;
+  };
+
   const copyToClipboard = async (text: string, id: string) => {
     try {
       await navigator.clipboard.writeText(text);
@@ -238,13 +307,25 @@ const AIAssistant: React.FC = () => {
   const getFriendlyErrorMessage = (error: any): string => {
     const errString = error?.toString()?.toLowerCase() || "";
     const message = error?.message?.toLowerCase() || "";
+    const status = error?.status || error?.response?.status;
 
     if (!navigator.onLine) {
       return "**Connection Lost**\nIt looks like you're offline. Please check your internet connection and try again.";
     }
 
-    if (message.includes('429') || message.includes('quota') || errString.includes('quota')) {
-      return "**Usage Limit Reached**\nI'm receiving a high volume of requests. Please wait a moment before trying again.";
+    // More specific rate limit detection
+    if (status === 429 || 
+        message.includes('429') || 
+        message.includes('rate limit') || 
+        message.includes('too many requests') ||
+        (message.includes('quota') && (message.includes('exceeded') || message.includes('limit reached')))) {
+      
+      // Distinguish between rate limit and quota exceeded
+      if (message.includes('quota exceeded') || message.includes('daily limit') || message.includes('monthly limit')) {
+        return "**Quota Exceeded**\nYou've reached your daily usage limit. Please try again tomorrow or upgrade your plan.";
+      } else {
+        return "**Rate Limit Reached**\nToo many requests in a short time. Please wait a moment before trying again.";
+      }
     }
 
     if (message.includes('api key') || message.includes('apikey') || (message.includes('400') && message.includes('key'))) {
@@ -267,8 +348,30 @@ const AIAssistant: React.FC = () => {
   };
 
   const handleSendMessage = async (text: string = inputValue) => {
-    if (!text.trim() || isLoadingRef.current) return;
-
+    // Prevent duplicate requests and check cooldown
+    const now = Date.now();
+    if (!text.trim() || isLoadingRef.current || requestLockRef.current || isInCooldown) {
+      console.log('Request blocked:', { 
+        empty: !text.trim(), 
+        loading: isLoadingRef.current, 
+        locked: requestLockRef.current, 
+        cooldown: isInCooldown 
+      });
+      return;
+    }
+    
+    // Cooldown period (7 seconds to prevent rate limits)
+    if (now - lastRequestTime < 7000) {
+      console.log('Request blocked by cooldown');
+      setIsInCooldown(true);
+      setTimeout(() => setIsInCooldown(false), 7000 - (now - lastRequestTime));
+      return;
+    }
+    
+    // Set request lock to prevent duplicates
+    requestLockRef.current = true;
+    setLastRequestTime(now);
+    
     const userMessage: Message = {
       id: Date.now().toString(),
       role: 'user',
@@ -303,40 +406,28 @@ const AIAssistant: React.FC = () => {
     setLoadingMessage(newSteps[0]);
 
     try {
-      const ai = new GoogleGenAI({ apiKey: "AIzaSyCmLxRAoZGEXl_vQIZZXeCzCXuJTdxzY3w" });
+      const ai = new GoogleGenAI({ apiKey: config.gemini.apiKey });
       
-      const systemInstruction = `You are DocFlow AI, the intelligent virtual assistant for a premium cloud-based document tool suite.
+      const systemInstruction = `You are DocFlow AI assistant for PDF tools (Merge, Split, Compress, Convert, Edit, Sign, Protect).
 
-**Your Role:**
-Guide users through our ecosystem of 20+ PDF tools including Merge, Split, Compress, Convert (PDF to Word/Excel/PPT/JPG), Edit, Sign, and Protect.
+Keep responses concise and helpful. Use Google Search when needed for current info.
 
-**Capabilities:**
-- You have access to **Google Search** to provide real-time, up-to-date information when users ask about current events, specific facts, or external resources (e.g., "latest PDF standards", "competitor pricing").
-- When using search, relevant sources will be automatically displayed to the user; simply reference them naturally if needed.
+Security: 256-bit AES encryption, auto-delete after 2 hours, ISO 27001 certified, no data mining.
 
-**Security Protocols (High Priority):**
-When asked about safety, privacy, or security, explicitly state our 'Vault Security' standards:
-1. **Encryption**: We use banking-grade 256-bit AES encryption for all file transfers and processing.
-2. **Data Retention**: Files are strictly and automatically deleted from our servers after 2 hours.
-3. **Compliance**: Our processing environment is ISO 27001 certified.
-4. **Privacy**: We do not mine, read, or sell user document content.
-
-**Interaction Guidelines:**
-- For "How do I..." questions, provide clear, numbered step-by-step instructions.
-- Use Markdown for clear formatting (bold keywords, lists).
-- Keep responses concise, friendly, and professional.
-- If a user wants to process a file *now*, kindly explain that you are the assistant and guide them to click the relevant tool card in the 'Tools' section of the dashboard.`;
+For "how to" questions: give clear steps. Format with markdown. If user wants to process now, direct them to tool cards.`;
       
-      // Filter out empty messages and the welcome message to prevent API errors
+      // Filter out empty messages and the welcome message, limit to last 3 messages to reduce token usage
       const validHistory = messages
         .filter(m => m.id !== 'welcome' && m.text.trim().length > 0 && !m.isError)
+        .slice(-3) // Keep only last 3 messages for minimal token usage
         .map(m => ({
             role: m.role,
             parts: [{ text: m.text }]
         }));
 
+      // REMOVED RETRY LOGIC - Direct API call
       const streamResponse = await ai.models.generateContentStream({
-        model: 'gemini-3-flash-preview',
+        model: 'gemini-2.5-flash',
         contents: [
             ...validHistory,
             { role: 'user', parts: [{ text }] }
@@ -395,7 +486,8 @@ When asked about safety, privacy, or security, explicitly state our 'Vault Secur
       }
 
     } catch (error) {
-      console.error(error);
+      console.error('API Error:', error);
+      
       const friendlyError = getFriendlyErrorMessage(error);
       setMessages(prev => [...prev, {
         id: Date.now().toString(),
@@ -404,15 +496,17 @@ When asked about safety, privacy, or security, explicitly state our 'Vault Secur
         isError: true
       }]);
     } finally {
+      // Clean up locks and loading state
       setIsLoading(false);
+      requestLockRef.current = false;
+      isLoadingRef.current = false;
     }
   };
 
-  // Ref for handleSendMessage to avoid stale closures in event listener
-  const handleSendMessageRef = useRef(handleSendMessage);
-  useEffect(() => {
-    handleSendMessageRef.current = handleSendMessage;
-  }, [handleSendMessage]);
+  // Ref for handleSendMessage - FIXED: No useEffect dependency loop
+  const handleSendMessageRef = useRef<any>(null);
+  // Always keep ref updated
+  handleSendMessageRef.current = handleSendMessage;
 
   // Listen for custom event to open assistant
   useEffect(() => {
